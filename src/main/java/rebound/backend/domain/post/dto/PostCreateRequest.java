@@ -16,5 +16,7 @@ public record PostCreateRequest(
         String situationContent,
         String failureContent,
         String learningContent,
-        String nextStepContent
+        String nextStepContent,
+
+        Boolean publish
 ) {}
