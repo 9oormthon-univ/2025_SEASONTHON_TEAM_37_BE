@@ -1,10 +1,10 @@
-package goorm.rebound;
+package rebound.backend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class ReboundApplicationTests {
+class BackendApplicationTests {
 
 	@Test
 	void contextLoads() {
