@@ -1,10 +1,10 @@
-package goorm.rebound.member.controller;
+package rebound.backend.member.controller;
 
-import goorm.rebound.member.dtos.requests.JoinRequest;
-import goorm.rebound.member.dtos.responses.JoinResponse;
-import goorm.rebound.member.dtos.requests.LoginRequest;
-import goorm.rebound.member.dtos.responses.LoginResponse;
-import goorm.rebound.member.service.MemberService;
+import rebound.backend.member.dtos.requests.JoinRequest;
+import rebound.backend.member.dtos.responses.JoinResponse;
+import rebound.backend.member.dtos.requests.LoginRequest;
+import rebound.backend.member.dtos.responses.LoginResponse;
+import rebound.backend.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

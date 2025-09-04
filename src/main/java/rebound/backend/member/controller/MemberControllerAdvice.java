@@ -1,4 +1,4 @@
-package goorm.rebound.member.controller;
+package rebound.backend.member.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

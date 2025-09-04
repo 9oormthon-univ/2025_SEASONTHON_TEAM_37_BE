@@ -1,12 +1,12 @@
-package goorm.rebound.member.service;
+package rebound.backend.member.service;
 
-import goorm.rebound.member.domain.Member;
-import goorm.rebound.member.dtos.requests.JoinRequest;
-import goorm.rebound.member.dtos.responses.JoinResponse;
-import goorm.rebound.member.dtos.requests.LoginRequest;
-import goorm.rebound.member.dtos.responses.LoginResponse;
-import goorm.rebound.member.repository.MemberRepository;
-import goorm.rebound.member.util.JwtUtil;
+import rebound.backend.member.domain.Member;
+import rebound.backend.member.dtos.requests.JoinRequest;
+import rebound.backend.member.dtos.responses.JoinResponse;
+import rebound.backend.member.dtos.requests.LoginRequest;
+import rebound.backend.member.dtos.responses.LoginResponse;
+import rebound.backend.member.repository.MemberRepository;
+import rebound.backend.member.util.JwtUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

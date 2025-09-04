@@ -1,4 +1,4 @@
-package goorm.rebound.member.util;
+package rebound.backend.member.util;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

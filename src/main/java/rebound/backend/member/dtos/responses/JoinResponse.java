@@ -1,4 +1,4 @@
-package goorm.rebound.member.dtos.responses;
+package rebound.backend.member.dtos.responses;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,7 +7,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @AllArgsConstructor
-public class LoginResponse {
+public class JoinResponse {
     private String loginId;
-    private String token;
+    private Long memberId;
 }

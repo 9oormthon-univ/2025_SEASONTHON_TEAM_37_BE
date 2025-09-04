@@ -1,4 +1,4 @@
-package goorm.rebound.member.util;
+package rebound.backend.member.util;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

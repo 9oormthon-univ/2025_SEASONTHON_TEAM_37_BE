@@ -1,6 +1,6 @@
-package goorm.rebound.member.repository;
+package rebound.backend.member.repository;
 
-import goorm.rebound.member.domain.Member;
+import rebound.backend.member.domain.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
