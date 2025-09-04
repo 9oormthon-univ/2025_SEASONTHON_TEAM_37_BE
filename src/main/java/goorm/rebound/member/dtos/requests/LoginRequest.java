@@ -1,4 +1,4 @@
-package goorm.rebound.member.dtos;
+package goorm.rebound.member.dtos.requests;
 
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
