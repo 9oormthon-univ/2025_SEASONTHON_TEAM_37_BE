@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = MemberController.class)
+@RestControllerAdvice(basePackageClasses = RegisterController.class)
 public class MemberControllerAdvice {
 
     @ExceptionHandler(IllegalArgumentException.class)
