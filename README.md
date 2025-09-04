@@ -1,2 +1,0 @@
-2025_SEASONTHON_TEAM_15_BE
-# 구름도약 팀 백엔드
