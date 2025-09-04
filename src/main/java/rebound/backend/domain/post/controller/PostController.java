@@ -12,6 +12,7 @@ import rebound.backend.domain.category.entity.MainCategory;
 import rebound.backend.domain.category.entity.SubCategory;
 import rebound.backend.domain.post.dto.PostCreateRequest;
 import rebound.backend.domain.post.dto.PostResponse;
+import rebound.backend.domain.post.dto.PostUpdateRequest;
 import rebound.backend.domain.post.service.PostService;
 
 import java.io.IOException;
@@ -30,7 +31,6 @@ public class PostController {
     @Operation(summary = "게시글 생성 (이미지 포함)", description = "게시글 데이터와 이미지 파일을 multipart/form-data 형식으로 받습니다.")
     @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<PostResponse> createPost(
-            // ✅ 제안해주신 대로, 각 필드를 @RequestParam으로 받도록 수정했습니다.
             @RequestParam("memberId") Long memberId,
             @RequestParam("mainCategory") MainCategory mainCategory,
             @RequestParam("subCategory") SubCategory subCategory,
@@ -62,6 +62,43 @@ public class PostController {
 
         PostResponse response = postService.createPostWithImage(request, file);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    /**
+     * 게시글 수정
+     */
+    @Operation(summary = "게시글 수정", description = "게시글의 내용과 이미지를 수정합니다.")
+    @PatchMapping(value = "/{postId}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+    public ResponseEntity<PostResponse> updatePost(
+            @PathVariable Long postId,
+            @RequestParam("mainCategory") MainCategory mainCategory,
+            @RequestParam("subCategory") SubCategory subCategory,
+            @RequestParam("title") String title,
+            @RequestParam("isAnonymous") Boolean isAnonymous,
+            @RequestParam(value = "situationContent", required = false) String situationContent,
+            @RequestParam(value = "failureContent", required = false) String failureContent,
+            @RequestParam(value = "learningContent", required = false) String learningContent,
+            @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
+            @RequestParam(value = "tags", required = false) List<String> tags,
+            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+
+        PostUpdateRequest request = new PostUpdateRequest(
+                mainCategory, subCategory, title, isAnonymous,
+                situationContent, failureContent, learningContent, nextStepContent, tags
+        );
+
+        PostResponse response = postService.updatePost(postId, request, file);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 게시글 삭제
+     */
+    @Operation(summary = "게시글 삭제", description = "게시글을 삭제합니다.")
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<Void> deletePost(@PathVariable Long postId) {
+        postService.deletePost(postId);
+        return ResponseEntity.noContent().build(); // 204 No Content 응답
     }
 
     /**

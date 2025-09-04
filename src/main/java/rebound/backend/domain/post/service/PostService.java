@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.domain.post.dto.PostCreateRequest;
 import rebound.backend.domain.post.dto.PostResponse;
+import rebound.backend.domain.post.dto.PostUpdateRequest;
 import rebound.backend.domain.post.entity.Post;
 import rebound.backend.domain.post.entity.PostContent;
 import rebound.backend.domain.post.repository.PostRepository;
@@ -14,9 +15,6 @@ import rebound.backend.domain.tag.entity.Tag;
 import rebound.backend.domain.tag.repository.TagRepository;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -77,6 +75,52 @@ public class PostService {
 
         return PostResponse.from(savedPost);
     }
+
+    @Transactional
+    public PostResponse updatePost(Long postId, PostUpdateRequest request, MultipartFile file) throws IOException {
+        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
+        Post post = findPostById(postId);
+
+        // 이미지 파일이 새로 첨부된 경우, S3에 업로드하고 URL 업데이트
+        if (file != null && !file.isEmpty()) {
+            // 참고: 기존 S3 이미지를 삭제하는 로직을 S3Service에 추가하면 더 좋습니다.
+            String newImageUrl = s3Service.uploadFile(file);
+            post.setImageUrl(newImageUrl);
+        }
+
+        // DTO의 내용으로 게시글 필드 업데이트
+        post.setMainCategory(request.mainCategory());
+        post.setSubCategory(request.subCategory());
+        post.setTitle(request.title());
+        post.setIsAnonymous(request.isAnonymous());
+
+        PostContent postContent = post.getPostContent();
+        postContent.setSituationContent(request.situationContent());
+        postContent.setFailureContent(request.failureContent());
+        postContent.setLearningContent(request.learningContent());
+        postContent.setNextStepContent(request.nextStepContent());
+
+        // 태그 업데이트 (요청된 태그로 전체 교체)
+        if (request.tags() != null) {
+            // Post 엔티티의 연관관계 편의 메서드를 사용하여 태그를 관리하는 것이 좋습니다.
+            post.getTags().clear(); // 이 방식은 orphanRemoval=true 옵션과 함께 사용 시 주의가 필요합니다.
+            request.tags().forEach(tagName -> {
+                Tag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+                post.addTag(tag);
+            });
+        }
+
+        return PostResponse.from(post); // 변경 감지(Dirty Checking)에 의해 자동 업데이트
+    }
+
+    @Transactional
+    public void deletePost(Long postId) {
+        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
+        Post post = findPostById(postId);
+        postRepository.delete(post);
+    }
+
     /**
      * 기능: 임시 저장된 글을 '발행' 상태로 변경
      */
@@ -123,4 +167,8 @@ public class PostService {
         post.setStatus(Post.Status.PUBLIC);
     }
 
+    public Post findPostById(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
+    }
 }
