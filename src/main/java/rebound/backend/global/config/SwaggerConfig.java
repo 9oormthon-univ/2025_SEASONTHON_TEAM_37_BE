@@ -17,7 +17,7 @@ public class SwaggerConfig {
 
         return new OpenAPI()
                 .info(new Info()
-                        .title("SPL")
+                        .title("Rebound")
                         .version("1.0.0")
                         .description("Swagger 테스트 with JWT 인증"))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
