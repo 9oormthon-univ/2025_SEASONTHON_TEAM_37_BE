@@ -1,7 +1,7 @@
-package rebound.backend.repository;
+package rebound.backend.post.repository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import rebound.backend.entity.Comment;
+import rebound.backend.post.entity.Comment;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
-package rebound.backend.repository;
+package rebound.backend.post.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
-import rebound.backend.entity.PostBookmark;
+import rebound.backend.post.entity.PostBookmark;
 
 public interface PostBookmarkRepository extends JpaRepository<PostBookmark, Long> {
     boolean existsByPostIdAndMemberId(Long postId, Long memberId);

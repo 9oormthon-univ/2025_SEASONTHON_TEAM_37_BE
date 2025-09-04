@@ -1,8 +1,8 @@
-package rebound.backend.controller;
+package rebound.backend.post.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import rebound.backend.service.InteractionService;
+import rebound.backend.post.service.InteractionService;
 
 import java.util.Map;
 

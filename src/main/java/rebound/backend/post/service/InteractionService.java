@@ -1,13 +1,13 @@
-package rebound.backend.service;
+package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import rebound.backend.entity.PostBookmark;
-import rebound.backend.entity.PostReaction;
-import rebound.backend.entity.ReactionType;
-import rebound.backend.repository.PostBookmarkRepository;
-import rebound.backend.repository.PostReactionRepository;
+import rebound.backend.post.entity.PostBookmark;
+import rebound.backend.post.entity.PostReaction;
+import rebound.backend.post.entity.ReactionType;
+import rebound.backend.post.repository.PostBookmarkRepository;
+import rebound.backend.post.repository.PostReactionRepository;
 
 @Service @RequiredArgsConstructor
 public class InteractionService {
@@ -15,7 +15,7 @@ public class InteractionService {
     private final PostBookmarkRepository bookmarkRepo;
 
     // TODO: OAuth 붙으면 SecurityContext에서 memberId 가져오기
-    private Long me() { return rebound.backend.security.AuthUtils.currentMemberId(); }
+    private Long me() { return rebound.backend.utils.AuthUtils.currentMemberId(); }
 
     @Transactional
     public ToggleResult toggleHeart(Long postId) {

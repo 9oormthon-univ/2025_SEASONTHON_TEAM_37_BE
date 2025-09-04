@@ -1,10 +1,10 @@
-package rebound.backend.controller;
+package rebound.backend.post.controller;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import rebound.backend.entity.Comment;
-import rebound.backend.service.CommentService;
+import rebound.backend.post.entity.Comment;
+import rebound.backend.post.service.CommentService;
 
 import java.util.*;
 

@@ -1,14 +1,14 @@
-package rebound.backend.service;
+package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import rebound.backend.entity.Comment;
-import rebound.backend.entity.CommentReaction;
-import rebound.backend.entity.ReactionType;
-import rebound.backend.repository.CommentReactionRepository;
-import rebound.backend.repository.CommentRepository;
+import rebound.backend.post.entity.Comment;
+import rebound.backend.post.entity.CommentReaction;
+import rebound.backend.post.entity.ReactionType;
+import rebound.backend.post.repository.CommentReactionRepository;
+import rebound.backend.post.repository.CommentRepository;
 
 import java.util.List;
 
@@ -17,7 +17,7 @@ public class CommentService {
     private final CommentRepository commentRepo;
     private final CommentReactionRepository reactionRepo;
 
-    private Long me() { return rebound.backend.security.AuthUtils.currentMemberId(); }
+    private Long me() { return rebound.backend.utils.AuthUtils.currentMemberId(); }
 
     public List<Comment> list(Long postId, int page, int size) {
         return commentRepo.findByPostIdOrderByCreatedAtAsc(postId, PageRequest.of(page, size));

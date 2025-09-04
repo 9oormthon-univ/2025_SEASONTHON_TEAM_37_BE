@@ -1,4 +1,4 @@
-package rebound.backend.entity;
+package rebound.backend.post.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

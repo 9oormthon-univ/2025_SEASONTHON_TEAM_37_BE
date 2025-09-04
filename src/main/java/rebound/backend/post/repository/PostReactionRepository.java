@@ -1,7 +1,7 @@
-package rebound.backend.repository;
+package rebound.backend.post.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
-import rebound.backend.entity.PostReaction;
-import rebound.backend.entity.ReactionType;
+import rebound.backend.post.entity.PostReaction;
+import rebound.backend.post.entity.ReactionType;
 
 public interface PostReactionRepository extends JpaRepository<PostReaction, Long> {
     boolean existsByPostIdAndMemberIdAndType(Long postId, Long memberId, ReactionType type);
