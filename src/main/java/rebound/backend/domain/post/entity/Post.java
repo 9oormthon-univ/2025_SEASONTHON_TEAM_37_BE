@@ -18,6 +18,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "postId")
 public class Post {
 
     @Id
@@ -73,14 +74,21 @@ public class Post {
         PUBLIC, HIDDEN, DELETED, DRAFT
     }
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
             name = "post_tag",
             joinColumns = @JoinColumn(name = "post_id", foreignKey = @ForeignKey(name="fk_post_tag_post")),
             inverseJoinColumns = @JoinColumn(name = "tag_id", foreignKey = @ForeignKey(name="fk_post_tag_tag")),
             uniqueConstraints = @UniqueConstraint(name = "uq_post_tag", columnNames = {"post_id","tag_id"})
     )
+
+    @Builder.Default
     private Set<Tag> tags = new LinkedHashSet<>();
+
+    public void addTag(Tag tag) {
+        this.tags.add(tag);
+        tag.getPosts().add(this);
+    }
 
     /** 카테고리 일관성 보장: 소분류가 대분류에 속하는지 확인 */
     @PrePersist @PreUpdate

@@ -8,6 +8,7 @@ import rebound.backend.domain.post.entity.Post;
 @Table(name = "tag")
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
+@EqualsAndHashCode(of = "tagId")
 public class Tag {
 
     @Id
@@ -19,6 +20,7 @@ public class Tag {
     private String name;
 
     //역방향 참조 -> 태그에서 해당 태그가 달린 게시글 목록을 가져오고 싶을 때 사용
+    @Builder.Default
     @ManyToMany(mappedBy = "tags", fetch = FetchType.LAZY)
     private java.util.Set<Post> posts = new java.util.LinkedHashSet<>();
 }

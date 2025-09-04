@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import rebound.backend.domain.category.entity.MainCategory;
 import rebound.backend.domain.category.entity.SubCategory;
 
+import java.util.List;
+
 public record PostCreateRequest(
         @NotNull Long memberId,
         @NotNull MainCategory mainCategory,
@@ -18,5 +20,6 @@ public record PostCreateRequest(
         String learningContent,
         String nextStepContent,
 
-        Boolean publish
+        Boolean publish,
+        List<String> tags
 ) {}

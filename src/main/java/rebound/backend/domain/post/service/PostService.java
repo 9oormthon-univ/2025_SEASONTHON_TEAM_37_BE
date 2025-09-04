@@ -8,6 +8,12 @@ import rebound.backend.domain.post.dto.PostResponse;
 import rebound.backend.domain.post.entity.Post;
 import rebound.backend.domain.post.entity.PostContent;
 import rebound.backend.domain.post.repository.PostRepository;
+import rebound.backend.domain.tag.entity.Tag;
+import rebound.backend.domain.tag.repository.TagRepository;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +21,8 @@ import rebound.backend.domain.post.repository.PostRepository;
 public class PostService {
 
     private final PostRepository postRepository;
+    private final TagRepository tagRepository;
+
     /**
      * 기능: 새 글을 '발행' 또는 '임시 저장' 상태로 생성
      */
@@ -27,6 +35,7 @@ public class PostService {
                 .learningContent(request.learningContent())
                 .nextStepContent(request.nextStepContent())
                 .build();
+
 
         Post.Status finalstatus = (request.publish() != null && request.publish())
                 ? Post.Status.PUBLIC
@@ -47,10 +56,16 @@ public class PostService {
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        // 4. Post 저장 (PostContent는 Post에 의해 자동으로 저장됨)
+        if (request.tags() != null && !request.tags().isEmpty()) {
+            request.tags().forEach(tagName -> {
+                Tag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+                post.addTag(tag); // Post 엔티티에 추가한 연관관계 편의 메서드 사용
+            });
+        }
+
         Post savedPost = postRepository.save(post);
 
-        // 5. 응답 DTO로 변환하여 반환
         return PostResponse.from(savedPost);
     }
     /**
