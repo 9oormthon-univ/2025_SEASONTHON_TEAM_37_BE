@@ -25,8 +25,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        //게시물 올리는 경우는 로그인 토큰 필요
-                        .requestMatchers(HttpMethod.POST, "/api/v1/posts").authenticated()
+                        //게시물 관련 접근 경로는 로그인 토큰 없이 접근 불가(403)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/posts/**").authenticated()
                         //그 이외에는 토큰 없이도 허용
                         .anyRequest().permitAll()
                 )
