@@ -15,8 +15,8 @@ public class PostResponse {
     private final Long postId;
     private final String title;
     private final LocalDateTime createdAt;
-
     private final List<String> tags;
+    private final String imageUrl;
 
     public static PostResponse from(Post post) {
         List<String> tagNames = post.getTags().stream()
@@ -28,6 +28,7 @@ public class PostResponse {
                 .title(post.getTitle())
                 .createdAt(post.getCreatedAt())
                 .tags(tagNames)
+                .imageUrl(post.getImageUrl())
                 .build();
     }
 }

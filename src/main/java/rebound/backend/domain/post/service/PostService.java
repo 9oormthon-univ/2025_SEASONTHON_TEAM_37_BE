@@ -3,14 +3,17 @@ package rebound.backend.domain.post.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.domain.post.dto.PostCreateRequest;
 import rebound.backend.domain.post.dto.PostResponse;
 import rebound.backend.domain.post.entity.Post;
 import rebound.backend.domain.post.entity.PostContent;
 import rebound.backend.domain.post.repository.PostRepository;
+import rebound.backend.domain.s3.service.S3Service;
 import rebound.backend.domain.tag.entity.Tag;
 import rebound.backend.domain.tag.repository.TagRepository;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -22,13 +25,20 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
+    private final S3Service s3Service;
 
     /**
      * 기능: 새 글을 '발행' 또는 '임시 저장' 상태로 생성
      */
     @Transactional
-    public PostResponse createPost(PostCreateRequest request) {
-        // 1. PostContent 엔티티 생성
+    public PostResponse createPostWithImage(PostCreateRequest request, MultipartFile file) throws IOException {
+        String imageUrl = null;
+        // 1. 파일이 존재하는 경우에만 S3에 업로드하고 URL을 가져옵니다.
+        if (file != null && !file.isEmpty()) {
+            imageUrl = s3Service.uploadFile(file);
+        }
+
+        // 2. 게시글 컨텐츠를 생성합니다.
         PostContent postContent = PostContent.builder()
                 .situationContent(request.situationContent())
                 .failureContent(request.failureContent())
@@ -36,31 +46,30 @@ public class PostService {
                 .nextStepContent(request.nextStepContent())
                 .build();
 
-
-        Post.Status finalstatus = (request.publish() != null && request.publish())
+        Post.Status status = (request.publish() != null && request.publish())
                 ? Post.Status.PUBLIC
                 : Post.Status.DRAFT;
 
-        // 2. Post 엔티티 생성
+        // 3. 태그를 제외한 Post 엔티티를 먼저 생성합니다.
         Post post = Post.builder()
                 .memberId(request.memberId())
                 .mainCategory(request.mainCategory())
                 .subCategory(request.subCategory())
                 .title(request.title())
-                .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE) // null 체크
-                .imageUrl(request.imageUrl())
-                .status(finalstatus)
+                .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
+                .imageUrl(imageUrl) // S3에서 받은 이미지 URL 저장
+                .status(status)
                 .build();
 
-        // 3. 연관관계 설정 (양방향)
         post.setPostContent(postContent);
         postContent.setPost(post);
 
+        // 4. 태그들을 조회하거나 생성한 후, Post에 하나씩 명시적으로 추가합니다.
         if (request.tags() != null && !request.tags().isEmpty()) {
             request.tags().forEach(tagName -> {
                 Tag tag = tagRepository.findByName(tagName)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
-                post.addTag(tag); // Post 엔티티에 추가한 연관관계 편의 메서드 사용
+                post.addTag(tag); // 연관관계 편의 메서드 사용
             });
         }
 
@@ -113,4 +122,5 @@ public class PostService {
 
         post.setStatus(Post.Status.PUBLIC);
     }
+
 }
