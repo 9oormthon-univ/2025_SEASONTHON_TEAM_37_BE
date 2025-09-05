@@ -9,11 +9,13 @@ import java.time.Instant;
 @Entity
 @Table(name = "post_reaction",
         uniqueConstraints = @UniqueConstraint(  //유니크제약 -> 같은 사용자가 같은 글에 같은 반응을 두번 만들 수 없도록.
-                name = "uk_post_member_type", columnNames = {"post_id","member_id","type"}),
-        indexes = { //인덱스로 집계/조회 속도 개선
+                name = "uk_post_type_member", columnNames = {"post_id","type","member_id"}
+        ),
+        indexes = {
                 @Index(name="ix_post_reaction_post", columnList = "post_id"),
                 @Index(name="ix_post_reaction_member", columnList = "member_id")
-        })
+        }
+        )
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PostReaction {
 

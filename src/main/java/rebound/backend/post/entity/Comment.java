@@ -10,6 +10,7 @@ import java.time.Instant;
         indexes = {
                 @Index(name="ix_comment_post", columnList="post_id"),
                 @Index(name="ix_comment_parent", columnList="parent_comment_id")
+                @Index(name = "ix_comment_post_created", columnList = "post_id,created_at")
         })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Comment {
@@ -21,16 +22,17 @@ public class Comment {
 
     @Column(name="parent_comment_id") private Long parentCommentId; // 대댓글(SELF FK)
 
-    @Column(name="content", nullable=false, columnDefinition="TEXT") private String content;
+    @Lob @Column(name="content", nullable=false, columnDefinition="TEXT") private String content;
 
     @Column(name="is_anonymous", nullable=false) private boolean isAnonymous = true; //익명/실명
 
-    // ERD: like(int). 예약어 충돌 방지를 위해 백틱 사용
-    @Column(name="`like`", nullable=false) private int likeCount = 0;
+    // 예약어 회피
+    @Column(name="like_count", nullable=false) private int likeCount = 0;
 
-    @Column(name="status", nullable=false, length=16) private String status = "PUBLIC"; // PUBLIC/HIDDEN/DELETED
+    @Enumerated(EnumType.STRING)
+    @Column(name="status", nullable=false, length=16) private CommentStatus status = CommentStatus.PUBLIC; // PUBLIC/HIDDEN/DELETED
 
     @CreationTimestamp @Column(name="created_at", updatable=false) private Instant createdAt;
-    @UpdateTimestamp   @Column(name="updated_at")                  private Instant updatedAt;
-    @Column(name="deleted_at")                                      private Instant deletedAt;
+    @UpdateTimestamp   @Column(name="updated_at") private Instant updatedAt;
+    @Column(name="deleted_at") private Instant deletedAt;
 }
