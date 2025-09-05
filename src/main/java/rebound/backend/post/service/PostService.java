@@ -9,7 +9,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
 import rebound.backend.member.domain.Member;
@@ -25,13 +24,11 @@ import rebound.backend.post.repository.PostBookmarkRepository;
 import rebound.backend.post.repository.PostReactionRepository;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.post.repository.PostSpecification;
-import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
-import rebound.backend.utils.NicknameMasker;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,13 +38,9 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
-    private final S3Service s3Service;
     private final MemberRepository memberRepository;
-
     private final PostReactionRepository postReactionRepository;
     private final PostBookmarkRepository postBookmarkRepository;
-    private final CommentRepository commentRepository;
-
 
     /**
      * 카테고리별 게시글 목록 조회
@@ -67,7 +60,6 @@ public class PostService {
         return mapToPostResponsePage(posts);
     }
 
-
     /**
      * 최신 게시글 목록 조회
      */
@@ -84,7 +76,6 @@ public class PostService {
         Member author = memberRepository.findById(post.getMemberId())
                 .orElse(null);
 
-        // 좋아요/스크랩 카운트 + 내 상태 추가
         long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
         long bookmarkCount = postBookmarkRepository.countByPostId(postId);
 
@@ -99,38 +90,50 @@ public class PostService {
     }
 
     /**
-     * 게시글 생성 (여러 이미지 포함)
+     * 게시글 생성 (JSON 기반)
      */
     @Transactional
-    public PostResponse createPostWithImages(PostCreateRequest request, List<MultipartFile> files) throws IOException {
+    public PostResponse createPost(PostCreateRequest request) {
         Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
         Member currentMember = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
 
         PostContent postContent = PostContent.builder()
-                .situationContent(request.situationContent()).failureContent(request.failureContent())
-                .learningContent(request.learningContent()).nextStepContent(request.nextStepContent()).build();
+                .situationContent(request.situationContent())
+                .failureContent(request.failureContent())
+                .learningContent(request.learningContent())
+                .nextStepContent(request.nextStepContent())
+                .build();
 
         Post post = Post.builder()
                 .memberId(currentMember.getId())
-                .mainCategory(request.mainCategory()).subCategory(request.subCategory())
-                .title(request.title()).isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
+                .mainCategory(request.mainCategory())
+                .subCategory(request.subCategory())
+                .title(request.title())
+                .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
                 .build();
+
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        if (files != null && !files.isEmpty()) {
-            List<String> imageUrls = s3Service.uploadFiles(files);
-            for (int i = 0; i < imageUrls.size(); i++) {
-                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
+        if (request.postImages() != null && !request.postImages().isEmpty()) {
+            for (int i = 0; i < request.postImages().size(); i++) {
+                String imageUrl = request.postImages().get(i).imageUrl();
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrl)
+                        .imageOrder(i)
+                        .build();
+                post.addImage(postImage);
             }
         }
+
         if (request.tags() != null && !request.tags().isEmpty()) {
             request.tags().forEach(tagName -> post.addTag(tagRepository.findByName(tagName)
                     .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()))));
         }
         Post savedPost = postRepository.save(post);
-        return PostResponse.from(savedPost, currentMember);
+
+        return PostResponse.from(savedPost, currentMember, 0L, 0L, false, false);
     }
 
     /**
@@ -144,20 +147,25 @@ public class PostService {
     }
 
     /**
-     * 게시글 수정
+     * 게시글 수정 (JSON 기반)
      */
     @Transactional
-    public PostResponse updatePost(Long postId, PostUpdateRequest request, List<MultipartFile> files) throws IOException {
+    public PostResponse updatePost(Long postId, PostUpdateRequest request) {
         Post post = findPostById(postId);
         authorizePostAuthor(post);
 
         post.getPostImages().clear();
-        if (files != null && !files.isEmpty()) {
-            List<String> imageUrls = s3Service.uploadFiles(files);
-            for (int i = 0; i < imageUrls.size(); i++) {
-                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
+        if (request.postImages() != null && !request.postImages().isEmpty()) {
+            for (int i = 0; i < request.postImages().size(); i++) {
+                String imageUrl = request.postImages().get(i).imageUrl();
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrl)
+                        .imageOrder(i)
+                        .build();
+                post.addImage(postImage);
             }
         }
+
         post.setMainCategory(request.mainCategory());
         post.setSubCategory(request.subCategory());
         post.setTitle(request.title());
@@ -167,18 +175,20 @@ public class PostService {
         postContent.setFailureContent(request.failureContent());
         postContent.setLearningContent(request.learningContent());
         postContent.setNextStepContent(request.nextStepContent());
+
         if (request.tags() != null) {
             post.getTags().clear();
             request.tags().forEach(tagName -> post.addTag(tagRepository.findByName(tagName)
                     .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()))));
         }
+
         if (request.status() != null) {
             post.setStatus(request.status());
         }
+
         Member author = memberRepository.findById(post.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
 
-        // 수정 후 최신 인터랙션 반영
         long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
         long bookmarkCount = postBookmarkRepository.countByPostId(postId);
         Long me = currentMemberIdOrNull();
@@ -191,7 +201,7 @@ public class PostService {
     }
 
     /**
-     * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
+     * 게시글 검색 (키워드 기반, 페이징 포함)
      */
     public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
         Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
@@ -232,7 +242,6 @@ public class PostService {
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
 
-            // 단건 집계(페이지 크기만큼)
             long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
             long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
 
@@ -246,7 +255,6 @@ public class PostService {
         });
     }
 
-    // 현재 로그인한 memberId (없으면 null) 추가
     private Long currentMemberIdOrNull() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) return null;

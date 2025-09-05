@@ -12,12 +12,12 @@ public record PostCreateRequest(
         @NotNull SubCategory subCategory,
         @NotBlank String title,
         Boolean isAnonymous,
-        String imageUrl,
 
         String situationContent,
         String failureContent,
         String learningContent,
         String nextStepContent,
 
-        List<String> tags
+        List<String> tags,
+        List<PostImageDto> postImages
 ) {}
