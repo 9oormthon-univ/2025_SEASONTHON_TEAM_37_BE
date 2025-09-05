@@ -2,6 +2,7 @@ package rebound.backend.post.dto;
 
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
+import rebound.backend.post.entity.Post;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ public record PostUpdateRequest(
         String failureContent,
         String learningContent,
         String nextStepContent,
-        List<String> tags
+        List<String> tags,
+        Post.Status status
 ) {
 }
