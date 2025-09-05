@@ -41,6 +41,12 @@ public class PostResponse {
         private final String profileImage;
     }
 
+    // 인터랙션 표시용 필드 추가
+    @Builder.Default private Long likeCount = 0L;
+    @Builder.Default private Long bookmarkCount = 0L;
+    @Builder.Default private Boolean liked = false;
+    @Builder.Default private Boolean bookmarked = false;
+
     @Getter
     @Builder
     public static class CategoryDetail {
@@ -116,4 +122,10 @@ public class PostResponse {
                 .nextStepContent(content != null ? content.getNextStepContent() : null)
                 .build();
     }
+
+    // 서비스에서 주입할 수 있도록 세터 추가
+    public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
+    public void setBookmarkCount(long bookmarkCount) { this.bookmarkCount = bookmarkCount; }
+    public void setLiked(boolean liked) { this.liked = liked; }
+    public void setBookmarked(boolean bookmarked) { this.bookmarked = bookmarked; }
 }
