@@ -74,13 +74,8 @@ public class PostService {
     public PostResponse getPostDetails(Long postId) {
         Post post = findPostById(postId);
         Member author = memberRepository.findById(post.getMemberId())
-                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-
-        String finalNickname = post.getIsAnonymous()
-                ? NicknameMasker.mask(author.getNickname())
-                : author.getNickname();
-
-        return PostResponse.from(post, finalNickname);
+                .orElse(null); // 탈퇴한 회원의 경우를 대비해 null 처리
+        return PostResponse.from(post, author);
     }
 
     /**
@@ -92,50 +87,30 @@ public class PostService {
         Member currentMember = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
 
-
         PostContent postContent = PostContent.builder()
-                .situationContent(request.situationContent())
-                .failureContent(request.failureContent())
-                .learningContent(request.learningContent())
-                .nextStepContent(request.nextStepContent())
-                .build();
+                .situationContent(request.situationContent()).failureContent(request.failureContent())
+                .learningContent(request.learningContent()).nextStepContent(request.nextStepContent()).build();
 
         Post post = Post.builder()
                 .memberId(currentMember.getId())
                 .mainCategory(request.mainCategory()).subCategory(request.subCategory())
                 .title(request.title()).isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
                 .build();
-
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        // 여러 이미지 업로드 및 PostImage 엔티티 생성/연결
         if (files != null && !files.isEmpty()) {
             List<String> imageUrls = s3Service.uploadFiles(files);
             for (int i = 0; i < imageUrls.size(); i++) {
-                PostImage postImage = PostImage.builder()
-                        .imageUrl(imageUrls.get(i))
-                        .imageOrder(i)
-                        .build();
-                post.addImage(postImage);
+                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
             }
         }
-
         if (request.tags() != null && !request.tags().isEmpty()) {
-            request.tags().forEach(tagName -> {
-                Tag tag = tagRepository.findByName(tagName)
-                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
-                post.addTag(tag);
-            });
+            request.tags().forEach(tagName -> post.addTag(tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()))));
         }
-
         Post savedPost = postRepository.save(post);
-
-        String finalNickname = savedPost.getIsAnonymous()
-                ? NicknameMasker.mask(currentMember.getNickname())
-                : currentMember.getNickname();
-
-        return PostResponse.from(savedPost, finalNickname);
+        return PostResponse.from(savedPost, currentMember);
     }
 
 
@@ -159,19 +134,13 @@ public class PostService {
         Post post = findPostById(postId);
         authorizePostAuthor(post);
 
-        // 이미지 업데이트
         post.getPostImages().clear();
         if (files != null && !files.isEmpty()) {
             List<String> imageUrls = s3Service.uploadFiles(files);
             for (int i = 0; i < imageUrls.size(); i++) {
-                PostImage postImage = PostImage.builder()
-                        .imageUrl(imageUrls.get(i))
-                        .imageOrder(i).build();
-                post.addImage(postImage);
+                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
             }
         }
-
-        // 내용 업데이트
         post.setMainCategory(request.mainCategory());
         post.setSubCategory(request.subCategory());
         post.setTitle(request.title());
@@ -181,58 +150,28 @@ public class PostService {
         postContent.setFailureContent(request.failureContent());
         postContent.setLearningContent(request.learningContent());
         postContent.setNextStepContent(request.nextStepContent());
-
-        // 태그 업데이트
         if (request.tags() != null) {
             post.getTags().clear();
-            request.tags().forEach(tagName -> {
-                Tag tag = tagRepository.findByName(tagName)
-                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
-                post.addTag(tag);
-            });
+            request.tags().forEach(tagName -> post.addTag(tagRepository.findByName(tagName)
+                    .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()))));
         }
-
-        // 상태 변경 로직 통합
         if (request.status() != null) {
             post.setStatus(request.status());
         }
-
         Member author = memberRepository.findById(post.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-        String finalNickname = post.getIsAnonymous()
-                ? NicknameMasker.mask(author.getNickname())
-                : author.getNickname();
-        return PostResponse.from(post, finalNickname);
+        return PostResponse.from(post, author);
     }
+
 
 
     /**
      * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
      */
     public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
-        // 1. Specification 객체를 생성하여 검색 조건을 정의합니다.
         Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
-
-        // 2. Repository에서 조건에 맞는 게시글 목록을 페이징하여 조회합니다.
         Page<Post> posts = postRepository.findAll(spec, pageable);
-
-        // 3. N+1 문제를 방지하기 위해 작성자 정보를 한 번에 조회합니다.
-        List<Long> authorIds = posts.getContent().stream()
-                .map(Post::getMemberId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(Member::getId, member -> member));
-
-        // 4. 조회된 Post 목록을 PostResponse DTO로 변환합니다.
-        return posts.map(post -> {
-            Member author = authors.get(post.getMemberId());
-            String nickname = (author != null) ? author.getNickname() : "알 수 없는 사용자";
-            String finalNickname = post.getIsAnonymous() ? NicknameMasker.mask(nickname) : nickname;
-            // PostSummaryResponse 대신 PostResponse.from을 호출합니다.
-            return PostResponse.from(post, finalNickname);
-        });
+        return mapToPostResponsePage(posts);
     }
 
     @Transactional
@@ -244,9 +183,7 @@ public class PostService {
 
 
     private void authorizePostAuthor(Post post) {
-        String currentMemberIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
-        Long currentMemberId = Long.valueOf(currentMemberIdStr);
-
+        Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
         if (!post.getMemberId().equals(currentMemberId)) {
             throw new AccessDeniedException("해당 게시글에 대한 권한이 없습니다.");
         }
@@ -268,9 +205,7 @@ public class PostService {
 
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
-            String nickname = (author != null) ? author.getNickname() : "알 수 없는 사용자";
-            String finalNickname = post.getIsAnonymous() ? NicknameMasker.mask(nickname) : nickname;
-            return PostResponse.from(post, finalNickname);
+            return PostResponse.from(post, author);
         });
     }
 }
