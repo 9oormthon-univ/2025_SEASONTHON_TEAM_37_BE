@@ -3,6 +3,7 @@ package rebound.backend.post.dto;
 import lombok.Builder;
 import lombok.Getter;
 import rebound.backend.post.entity.Post;
+import rebound.backend.post.entity.PostContent;
 import rebound.backend.tag.entity.Tag;
 
 import java.time.LocalDateTime;
@@ -20,6 +21,10 @@ public class PostResponse {
     private final String imageUrl;
     private final String authorNickname;
     private final CategoryDetail category;
+    private final String situationContent;
+    private final String failureContent;
+    private final String learningContent;
+    private final String nextStepContent;
 
     @Getter
     @Builder
@@ -54,6 +59,9 @@ public class PostResponse {
                 .map(Tag::getName)
                 .collect(Collectors.toList());
 
+        // PostContent가 null일 경우를 대비한 방어 코드
+        PostContent content = post.getPostContent();
+
         return PostResponse.builder()
                 .postId(post.getPostId())
                 .title(post.getTitle())
@@ -61,7 +69,11 @@ public class PostResponse {
                 .tags(tagNames)
                 .imageUrl(post.getImageUrl())
                 .authorNickname(authorNickname)
-                .category(CategoryDetail.from(post)) // 카테고리 정보 추가
+                .category(CategoryDetail.from(post))
+                .situationContent(content != null ? content.getSituationContent() : null)
+                .failureContent(content != null ? content.getFailureContent() : null)
+                .learningContent(content != null ? content.getLearningContent() : null)
+                .nextStepContent(content != null ? content.getNextStepContent() : null)
                 .build();
     }
 }

@@ -1,6 +1,8 @@
 package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,17 +55,20 @@ public class PostService {
     }
 
     /**
-     * 기능: 새 글을 '발행' 또는 '임시 저장' 상태로 생성
+     * 게시글 생성 (이미지 포함)
      */
     @Transactional
     public PostResponse createPostWithImage(PostCreateRequest request, MultipartFile file) throws IOException {
+        // SecurityContextHolder에서 현재 로그인한 사용자의 정보를 가져옴
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Member currentMember = memberRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
         String imageUrl = null;
-        // 1. 파일이 존재하는 경우에만 S3에 업로드하고 URL을 가져옵니다.
         if (file != null && !file.isEmpty()) {
             imageUrl = s3Service.uploadFile(file);
         }
 
-        // 2. 게시글 컨텐츠를 생성합니다.
         PostContent postContent = PostContent.builder()
                 .situationContent(request.situationContent())
                 .failureContent(request.failureContent())
@@ -75,48 +80,40 @@ public class PostService {
                 ? Post.Status.PUBLIC
                 : Post.Status.DRAFT;
 
-        // 3. 태그를 제외한 Post 엔티티를 먼저 생성합니다.
         Post post = Post.builder()
-                .memberId(request.memberId())
+                .memberId(currentMember.getId()) // JWT 토큰에서 조회한 사용자 ID 사용
                 .mainCategory(request.mainCategory())
                 .subCategory(request.subCategory())
                 .title(request.title())
                 .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
-                .imageUrl(imageUrl) // S3에서 받은 이미지 URL 저장
+                .imageUrl(imageUrl)
                 .status(status)
                 .build();
 
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        // 4. 태그들을 조회하거나 생성한 후, Post에 하나씩 명시적으로 추가합니다.
         if (request.tags() != null && !request.tags().isEmpty()) {
             request.tags().forEach(tagName -> {
                 Tag tag = tagRepository.findByName(tagName)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
-                post.addTag(tag); // 연관관계 편의 메서드 사용
+                post.addTag(tag);
             });
         }
 
         Post savedPost = postRepository.save(post);
 
-        Member author = memberRepository.findById(savedPost.getMemberId())
-                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-
-        // 익명 여부에 따라 닉네임을 가공합니다.
         String finalNickname = savedPost.getIsAnonymous()
-                ? NicknameMasker.mask(author.getNickname())
-                : author.getNickname();
+                ? NicknameMasker.mask(currentMember.getNickname())
+                : currentMember.getNickname();
 
-        // 최종적으로 모든 정보(닉네임, 카테고리 포함)를 담아 응답을 생성합니다.
         return PostResponse.from(savedPost, finalNickname);
     }
 
     @Transactional
     public PostResponse updatePost(Long postId, PostUpdateRequest request, MultipartFile file) throws IOException {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
         Post post = findPostById(postId);
-
+        authorizePostAuthor(post);
         // 이미지 파일이 새로 첨부된 경우, S3에 업로드하고 URL 업데이트
         if (file != null && !file.isEmpty()) {
             // 참고: 기존 S3 이미지를 삭제하는 로직을 S3Service에 추가하면 더 좋습니다.
@@ -147,13 +144,22 @@ public class PostService {
             });
         }
 
-        return PostResponse.from(post); // 변경 감지(Dirty Checking)에 의해 자동 업데이트
+        Member author = memberRepository.findById(post.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
+
+        // 익명 여부에 따라 닉네임을 가공합니다.
+        String finalNickname = post.getIsAnonymous()
+                ? NicknameMasker.mask(author.getNickname())
+                : author.getNickname();
+
+        // 최종적으로 모든 정보(닉네임, 카테고리 포함)를 담아 응답을 생성합니다.
+        return PostResponse.from(post, finalNickname);
     }
 
     @Transactional
     public void deletePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
         Post post = findPostById(postId);
+        authorizePostAuthor(post);
         postRepository.delete(post);
     }
 
@@ -162,9 +168,8 @@ public class PostService {
      */
     @Transactional
     public void publishPost(Long postId) {
-        // TODO: 나중에 JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가하면 좋습니다.
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
+        Post post = findPostById(postId);
+        authorizePostAuthor(post);
 
         // 이미 발행된 글은 다시 발행할 수 없도록 방어
         if (post.getStatus() != Post.Status.DRAFT) {
@@ -177,9 +182,8 @@ public class PostService {
 
     @Transactional
     public void hidePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
+        Post post = findPostById(postId);
+        authorizePostAuthor(post);
 
         // 공개된 게시글만 '나만 보기'로 변경 가능
         if (post.getStatus() != Post.Status.PUBLIC) {
@@ -191,9 +195,8 @@ public class PostService {
 
     @Transactional
     public void unhidePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
+        Post post = findPostById(postId);
+        authorizePostAuthor(post);
 
         // '나만 보기' 상태의 게시글만 '전체 공개'로 변경 가능
         if (post.getStatus() != Post.Status.HIDDEN) {
@@ -201,6 +204,16 @@ public class PostService {
         }
 
         post.setStatus(Post.Status.PUBLIC);
+    }
+
+    private void authorizePostAuthor(Post post) {
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Member currentMember = memberRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
+        if (!post.getMemberId().equals(currentMember.getId())) {
+            throw new AccessDeniedException("해당 게시글에 대한 수정/삭제 권한이 없습니다.");
+        }
     }
 
     public Post findPostById(Long postId) {

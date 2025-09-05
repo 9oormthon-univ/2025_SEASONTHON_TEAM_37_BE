@@ -37,7 +37,6 @@ public class PostController {
     @Operation(summary = "게시글 생성 (이미지 포함)", description = "게시글 데이터와 이미지 파일을 multipart/form-data 형식으로 받습니다.")
     @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<PostResponse> createPost(
-            @RequestParam("memberId") Long memberId,
             @RequestParam("mainCategory") MainCategory mainCategory,
             @RequestParam("subCategory") SubCategory subCategory,
             @RequestParam("title") String title,
@@ -52,7 +51,6 @@ public class PostController {
 
         // 서비스에 전달하기 위해 DTO를 조립합니다.
         PostCreateRequest request = new PostCreateRequest(
-                memberId,
                 mainCategory,
                 subCategory,
                 title,
