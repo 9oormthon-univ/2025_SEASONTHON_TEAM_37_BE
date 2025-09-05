@@ -24,6 +24,13 @@ public class PostController {
 
     private final PostService postService;
 
+    @Operation(summary = "게시글 상세 조회")
+    @GetMapping("/{postId}")
+    public ResponseEntity<PostResponse> getPostDetails(@PathVariable Long postId) {
+        PostResponse response = postService.getPostDetails(postId);
+        return ResponseEntity.ok(response);
+    }
+
     /**
      * 기능 1: 게시글 생성 (발행 또는 임시 저장)
      */

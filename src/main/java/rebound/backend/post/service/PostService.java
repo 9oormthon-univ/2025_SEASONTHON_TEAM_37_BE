@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import rebound.backend.member.domain.Member;
+import rebound.backend.member.repository.MemberRepository;
 import rebound.backend.post.dto.PostCreateRequest;
 import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
@@ -13,6 +15,7 @@ import rebound.backend.post.repository.PostRepository;
 import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
+import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
 
@@ -24,6 +27,30 @@ public class PostService {
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
     private final S3Service s3Service;
+    private final MemberRepository memberRepository;
+
+    /**
+     * 게시글 상세 조회 (익명 닉네임 처리 기능 포함)
+     */
+    public PostResponse getPostDetails(Long postId) {
+        Post post = findPostById(postId);
+
+        // memberId로 작성자 Member 엔티티를 조회
+        Member author = memberRepository.findById(post.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
+
+        String finalNickname;
+        if (post.getIsAnonymous()) {
+            // 익명일 경우, NicknameMasker를 사용해 닉네임을 마스킹합니다.
+            finalNickname = NicknameMasker.mask(author.getNickname());
+        } else {
+            // 익명이 아닐 경우, 원래 닉네임을 그대로 사용합니다.
+            finalNickname = author.getNickname();
+        }
+
+        // 최종적으로 가공된 닉네임을 DTO에 담아 반환합니다.
+        return PostResponse.from(post, finalNickname);
+    }
 
     /**
      * 기능: 새 글을 '발행' 또는 '임시 저장' 상태로 생성
@@ -73,7 +100,16 @@ public class PostService {
 
         Post savedPost = postRepository.save(post);
 
-        return PostResponse.from(savedPost);
+        Member author = memberRepository.findById(savedPost.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
+
+        // 익명 여부에 따라 닉네임을 가공합니다.
+        String finalNickname = savedPost.getIsAnonymous()
+                ? NicknameMasker.mask(author.getNickname())
+                : author.getNickname();
+
+        // 최종적으로 모든 정보(닉네임, 카테고리 포함)를 담아 응답을 생성합니다.
+        return PostResponse.from(savedPost, finalNickname);
     }
 
     @Transactional

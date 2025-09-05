@@ -12,13 +12,44 @@ import java.util.stream.Collectors;
 @Getter
 @Builder
 public class PostResponse {
+
     private final Long postId;
     private final String title;
     private final LocalDateTime createdAt;
     private final List<String> tags;
     private final String imageUrl;
+    private final String authorNickname;
+    private final CategoryDetail category;
 
+    @Getter
+    @Builder
+    public static class CategoryDetail {
+        private final String mainCategoryCode;
+        private final String mainCategoryLabel;
+        private final String subCategoryCode;
+        private final String subCategoryLabel;
+
+        public static CategoryDetail from(Post post) {
+            return CategoryDetail.builder()
+                    .mainCategoryCode(post.getMainCategory().name())
+                    .mainCategoryLabel(post.getMainCategory().getLabel())
+                    .subCategoryCode(post.getSubCategory().name())
+                    .subCategoryLabel(post.getSubCategory().getLabel())
+                    .build();
+        }
+    }
+
+    /**
+     * 게시글 생성/수정 등 닉네임 정보가 없을 때 호출하는 메서드
+     */
     public static PostResponse from(Post post) {
+        return from(post, null);
+    }
+
+    /**
+     * 게시글 상세 조회 등 모든 정보가 필요할 때 호출하는 완전한 메서드
+     */
+    public static PostResponse from(Post post, String authorNickname) {
         List<String> tagNames = post.getTags().stream()
                 .map(Tag::getName)
                 .collect(Collectors.toList());
@@ -29,6 +60,8 @@ public class PostResponse {
                 .createdAt(post.getCreatedAt())
                 .tags(tagNames)
                 .imageUrl(post.getImageUrl())
+                .authorNickname(authorNickname)
+                .category(CategoryDetail.from(post)) // 카테고리 정보 추가
                 .build();
     }
 }
