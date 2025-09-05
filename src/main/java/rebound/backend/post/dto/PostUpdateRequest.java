@@ -16,6 +16,7 @@ public record PostUpdateRequest(
         String learningContent,
         String nextStepContent,
         List<String> tags,
-        Post.Status status
+        Post.Status status,
+        List<PostImageDto> postImages
 ) {
 }
