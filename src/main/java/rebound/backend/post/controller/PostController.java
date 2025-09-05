@@ -10,17 +10,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
 import rebound.backend.post.dto.PostCreateRequest;
 import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
-import rebound.backend.post.entity.Post;
 import rebound.backend.post.service.PostService;
-
-import java.io.IOException;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -47,13 +42,6 @@ public class PostController {
         return ResponseEntity.ok(results);
     }
 
-    @Operation(summary = "게시글 상세 조회")
-    @GetMapping("/{postId}")
-    public ResponseEntity<PostResponse> getPostDetails(@PathVariable Long postId) {
-        PostResponse response = postService.getPostDetails(postId);
-        return ResponseEntity.ok(response);
-    }
-
     @Operation(summary = "내가 쓴 글 목록 조회", description = "현재 로그인한 사용자가 작성한 글 목록을 최신순으로 조회합니다.")
     @GetMapping("/my")
     public ResponseEntity<Page<PostResponse>> getMyPosts(
@@ -62,73 +50,27 @@ public class PostController {
         return ResponseEntity.ok(results);
     }
 
-    /**
-     * 기능 1: 게시글 생성 (발행 또는 임시 저장)
-     */
-    @Operation(summary = "게시글 생성 (이미지 포함)", description = "게시글 데이터와 이미지 파일을 multipart/form-data 형식으로 받습니다.")
-    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<PostResponse> createPost(
-            @RequestParam("mainCategory") MainCategory mainCategory,
-            @RequestParam("subCategory") SubCategory subCategory,
-            @RequestParam("title") String title,
-            @RequestParam(value = "isAnonymous", required = false) Boolean isAnonymous,
-            @RequestParam(value = "situationContent", required = false) String situationContent,
-            @RequestParam(value = "failureContent", required = false) String failureContent,
-            @RequestParam(value = "learningContent", required = false) String learningContent,
-            @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
-            @RequestParam(value = "tags", required = false) List<String> tags,
-            @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
-
-        // 서비스에 전달하기 위해 DTO를 조립합니다.
-        PostCreateRequest request = new PostCreateRequest(
-                mainCategory,
-                subCategory,
-                title,
-                isAnonymous,
-                null,
-                situationContent,
-                failureContent,
-                learningContent,
-                nextStepContent,
-                tags
-        );
-
-        PostResponse response = postService.createPostWithImages(request, files);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
-    }
-
-    /**
-     * 게시글 수정
-     */
-    @Operation(summary = "게시글 수정", description = "게시글의 내용, 이미지, 상태 등을 한번에 수정합니다.")
-    @PatchMapping(value = "/{postId}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<PostResponse> updatePost(
-            @PathVariable Long postId,
-            @RequestParam("mainCategory") MainCategory mainCategory,
-            @RequestParam("subCategory") SubCategory subCategory,
-            @RequestParam("title") String title,
-            @RequestParam("isAnonymous") Boolean isAnonymous,
-            @RequestParam(value = "situationContent", required = false) String situationContent,
-            @RequestParam(value = "failureContent", required = false) String failureContent,
-            @RequestParam(value = "learningContent", required = false) String learningContent,
-            @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
-            @RequestParam(value = "tags", required = false) List<String> tags,
-            @RequestParam(value = "status", required = false) Post.Status status, // status 파라미터 추가
-            @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
-
-        // DTO 조립 시 status 포함
-        PostUpdateRequest request = new PostUpdateRequest(
-                mainCategory, subCategory, title, isAnonymous,
-                situationContent, failureContent, learningContent, nextStepContent, tags, status
-        );
-
-        PostResponse response = postService.updatePost(postId, request, files);
+    @Operation(summary = "게시글 상세 조회")
+    @GetMapping("/{postId}")
+    public ResponseEntity<PostResponse> getPostDetails(@PathVariable Long postId) {
+        PostResponse response = postService.getPostDetails(postId);
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * 게시글 삭제
-     */
+    @Operation(summary = "게시글 생성 (JSON)", description = "게시글 데이터를 JSON 형식으로 받습니다.")
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE})
+    public ResponseEntity<PostResponse> createPost(@RequestBody PostCreateRequest req) {
+        PostResponse response = postService.createPost(req);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @Operation(summary = "게시글 수정", description = "게시글의 내용, 이미지, 상태 등을 한번에 수정합니다.")
+    @PatchMapping(value = "/{postId}", consumes = {MediaType.APPLICATION_JSON_VALUE})
+    public ResponseEntity<PostResponse> updatePost(@PathVariable Long postId, @RequestBody PostUpdateRequest req) {
+        PostResponse response = postService.updatePost(postId, req);
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "게시글 삭제", description = "게시글을 삭제합니다.")
     @DeleteMapping("/{postId}")
     public ResponseEntity<Void> deletePost(@PathVariable Long postId) {
@@ -145,4 +87,3 @@ public class PostController {
         return ResponseEntity.ok(results);
     }
 }
-
