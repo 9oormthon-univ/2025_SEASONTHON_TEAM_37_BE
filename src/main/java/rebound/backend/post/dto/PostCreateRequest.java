@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
+import rebound.backend.post.entity.PostImage;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ public record PostCreateRequest(
         @NotNull SubCategory subCategory,
         @NotBlank String title,
         Boolean isAnonymous,
-        String imageUrl,
+        List<PostImage> images,
 
         String situationContent,
         String failureContent,

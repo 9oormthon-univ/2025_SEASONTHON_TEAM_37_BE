@@ -82,7 +82,7 @@ public class PostService {
      * 게시글 생성 (여러 이미지 포함)
      */
     @Transactional
-    public PostResponse createPostWithImages(PostCreateRequest request, List<MultipartFile> files) throws IOException {
+    public PostResponse createPostWithImages(PostCreateRequest request) throws IOException {
         Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
         Member currentMember = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
@@ -99,10 +99,9 @@ public class PostService {
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        if (files != null && !files.isEmpty()) {
-            List<String> imageUrls = s3Service.uploadFiles(files);
-            for (int i = 0; i < imageUrls.size(); i++) {
-                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
+        if (request.images() != null && !request.images().isEmpty()) {
+            for (int i = 0; i < request.images().size(); i++) {
+                post.addImage(request.images().get(i));
             }
         }
         if (request.tags() != null && !request.tags().isEmpty()) {
@@ -130,15 +129,14 @@ public class PostService {
      * 게시글 수정
      */
     @Transactional
-    public PostResponse updatePost(Long postId, PostUpdateRequest request, List<MultipartFile> files) throws IOException {
+    public PostResponse updatePost(Long postId, PostUpdateRequest request) throws IOException {
         Post post = findPostById(postId);
         authorizePostAuthor(post);
 
         post.getPostImages().clear();
-        if (files != null && !files.isEmpty()) {
-            List<String> imageUrls = s3Service.uploadFiles(files);
-            for (int i = 0; i < imageUrls.size(); i++) {
-                post.addImage(PostImage.builder().imageUrl(imageUrls.get(i)).imageOrder(i).build());
+        if (request.images() != null && !request.images().isEmpty()) {
+            for (int i = 0; i < request.images().size(); i++) {
+                post.addImage(request.images().get(i));
             }
         }
         post.setMainCategory(request.mainCategory());

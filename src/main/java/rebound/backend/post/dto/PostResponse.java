@@ -5,7 +5,6 @@ import lombok.Getter;
 import rebound.backend.member.domain.Member;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
-import rebound.backend.post.entity.PostImage;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.utils.NicknameMasker;
 
@@ -22,7 +21,7 @@ public class PostResponse {
     private final String title;
     private final LocalDateTime createdAt;
     private final List<String> tags;
-    private final List<String> imageUrls;
+    private final List<PostImageResponse> images;
     private final CategoryDetail category;
     private final String situationContent;
     private final String failureContent;
@@ -96,8 +95,10 @@ public class PostResponse {
                 ? post.getTags().stream().map(Tag::getName).collect(Collectors.toList())
                 : Collections.emptyList();
 
-        List<String> imageUrls = (post.getPostImages() != null)
-                ? post.getPostImages().stream().map(PostImage::getImageUrl).collect(Collectors.toList())
+        List<PostImageResponse> images = (post.getPostImages() != null)
+                ? post.getPostImages().stream()
+                    .map(PostImageResponse::from)
+                    .collect(Collectors.toList())
                 : Collections.emptyList();
 
         PostContent content = post.getPostContent();
@@ -108,7 +109,7 @@ public class PostResponse {
                 .createdAt(post.getCreatedAt())
                 .author(authorDetail) // author 객체 설정
                 .tags(tagNames)
-                .imageUrls(imageUrls)
+                .images(images)
                 .category(CategoryDetail.from(post))
                 .situationContent(content != null ? content.getSituationContent() : null)
                 .failureContent(content != null ? content.getFailureContent() : null)
