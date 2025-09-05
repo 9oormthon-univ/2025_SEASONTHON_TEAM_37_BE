@@ -3,6 +3,8 @@ package rebound.backend.post.repository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
+import rebound.backend.category.entity.MainCategory;
+import rebound.backend.category.entity.SubCategory;
 import rebound.backend.post.entity.Post;
 
 public class PostSpecification {
@@ -31,6 +33,21 @@ public class PostSpecification {
                     nextStepContentPredicate
             );
         };
+    }
+    /**
+     * 대분류 필터링 조건
+     */
+    public static Specification<Post> hasMainCategory(MainCategory mainCategory) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("mainCategory"), mainCategory);
+    }
+
+    /**
+     * 소분류 필터링 조건
+     */
+    public static Specification<Post> hasSubCategory(SubCategory subCategory) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("subCategory"), subCategory);
     }
 }
 

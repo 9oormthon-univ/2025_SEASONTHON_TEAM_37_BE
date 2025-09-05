@@ -28,6 +28,16 @@ public class PostController {
 
     private final PostService postService;
 
+    @Operation(summary = "카테고리별 게시글 목록 조회", description = "소분류(subCategory)를 기준으로 게시글 목록을 조회합니다.")
+    @GetMapping
+    public ResponseEntity<Page<PostResponse>> getPosts(
+            @RequestParam(value = "mainCategory", required = false) MainCategory mainCategory,
+            @RequestParam(value = "subCategory") SubCategory subCategory,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<PostResponse> results = postService.getPosts(mainCategory, subCategory, pageable);
+        return ResponseEntity.ok(results);
+    }
+
     @Operation(summary = "게시글 상세 조회")
     @GetMapping("/{postId}")
     public ResponseEntity<PostResponse> getPostDetails(@PathVariable Long postId) {
