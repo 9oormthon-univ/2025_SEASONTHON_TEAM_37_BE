@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -35,6 +36,14 @@ public class PostController {
             @RequestParam(value = "subCategory") SubCategory subCategory,
             @PageableDefault(size = 10) Pageable pageable) {
         Page<PostResponse> results = postService.getPosts(mainCategory, subCategory, pageable);
+        return ResponseEntity.ok(results);
+    }
+
+    @Operation(summary = "최신 게시글 목록 조회", description = "최신순으로 정렬된 게시글 목록을 조회합니다.")
+    @GetMapping("/recent")
+    public ResponseEntity<Page<PostResponse>> getRecentPosts(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<PostResponse> results = postService.getRecentPosts(pageable);
         return ResponseEntity.ok(results);
     }
 

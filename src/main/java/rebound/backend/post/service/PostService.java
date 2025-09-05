@@ -61,6 +61,14 @@ public class PostService {
 
 
     /**
+     * 최신 게시글 목록 조회
+     */
+    public Page<PostResponse> getRecentPosts(Pageable pageable) {
+        Page<Post> posts = postRepository.findAll(pageable);
+        return mapToPostResponsePage(posts);
+    }
+
+    /**
      * 게시글 상세 조회
      */
     public PostResponse getPostDetails(Long postId) {
