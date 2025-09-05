@@ -2,6 +2,9 @@ package rebound.backend.post.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -106,5 +109,13 @@ public class PostController {
         return ResponseEntity.noContent().build(); // 204 No Content 응답
     }
 
+    @Operation(summary = "게시글 검색", description = "키워드를 사용하여 제목, 내용, 태그에서 게시글을 검색합니다.")
+    @GetMapping("/search")
+    public ResponseEntity<Page<PostResponse>> searchPosts(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<PostResponse> results = postService.searchPostsByKeyword(keyword, pageable);
+        return ResponseEntity.ok(results);
+    }
 }
 

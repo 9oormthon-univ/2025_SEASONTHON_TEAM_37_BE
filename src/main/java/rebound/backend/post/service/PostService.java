@@ -1,6 +1,9 @@
 package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,7 @@ import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
 import rebound.backend.post.entity.PostImage;
 import rebound.backend.post.repository.PostRepository;
+import rebound.backend.post.repository.PostSpecification;
 import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
@@ -22,6 +26,8 @@ import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -168,6 +174,35 @@ public class PostService {
         return PostResponse.from(post, finalNickname);
     }
 
+
+    /**
+     * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
+     */
+    public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
+        // 1. Specification 객체를 생성하여 검색 조건을 정의합니다.
+        Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
+
+        // 2. Repository에서 조건에 맞는 게시글 목록을 페이징하여 조회합니다.
+        Page<Post> posts = postRepository.findAll(spec, pageable);
+
+        // 3. N+1 문제를 방지하기 위해 작성자 정보를 한 번에 조회합니다.
+        List<Long> authorIds = posts.getContent().stream()
+                .map(Post::getMemberId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
+                .collect(Collectors.toMap(Member::getId, member -> member));
+
+        // 4. 조회된 Post 목록을 PostResponse DTO로 변환합니다.
+        return posts.map(post -> {
+            Member author = authors.get(post.getMemberId());
+            String nickname = (author != null) ? author.getNickname() : "알 수 없는 사용자";
+            String finalNickname = post.getIsAnonymous() ? NicknameMasker.mask(nickname) : nickname;
+            // PostSummaryResponse 대신 PostResponse.from을 호출합니다.
+            return PostResponse.from(post, finalNickname);
+        });
+    }
 
     @Transactional
     public void deletePost(Long postId) {
