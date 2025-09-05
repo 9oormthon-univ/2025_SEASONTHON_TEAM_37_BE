@@ -54,6 +54,14 @@ public class PostController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "내가 쓴 글 목록 조회", description = "현재 로그인한 사용자가 작성한 글 목록을 최신순으로 조회합니다.")
+    @GetMapping("/my")
+    public ResponseEntity<Page<PostResponse>> getMyPosts(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<PostResponse> results = postService.getMyPosts(pageable);
+        return ResponseEntity.ok(results);
+    }
+
     /**
      * 기능 1: 게시글 생성 (발행 또는 임시 저장)
      */

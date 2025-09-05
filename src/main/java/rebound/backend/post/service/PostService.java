@@ -88,9 +88,10 @@ public class PostService {
      */
     @Transactional
     public PostResponse createPostWithImages(PostCreateRequest request, List<MultipartFile> files) throws IOException {
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Member currentMember = memberRepository.findByLoginId(loginId)
+        Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        Member currentMember = memberRepository.findById(currentMemberId)
                 .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
 
         PostContent postContent = PostContent.builder()
                 .situationContent(request.situationContent())
@@ -137,6 +138,19 @@ public class PostService {
         return PostResponse.from(savedPost, finalNickname);
     }
 
+
+    /**
+     * 내가 쓴 글 목록 조회
+     */
+    public Page<PostResponse> getMyPosts(Pageable pageable) {
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Member currentMember = memberRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
+        Specification<Post> spec = PostSpecification.hasMemberId(currentMember.getId());
+        Page<Post> posts = postRepository.findAll(spec, pageable);
+        return mapToPostResponsePage(posts);
+    }
 
     /**
      * 게시글 수정
@@ -231,12 +245,11 @@ public class PostService {
 
 
     private void authorizePostAuthor(Post post) {
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Member currentMember = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+        String currentMemberIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long currentMemberId = Long.valueOf(currentMemberIdStr);
 
-        if (!post.getMemberId().equals(currentMember.getId())) {
-            throw new AccessDeniedException("해당 게시글에 대한 수정/삭제 권한이 없습니다.");
+        if (!post.getMemberId().equals(currentMemberId)) {
+            throw new AccessDeniedException("해당 게시글에 대한 권한이 없습니다.");
         }
     }
 
