@@ -19,6 +19,5 @@ public record PostCreateRequest(
         String learningContent,
         String nextStepContent,
 
-        Boolean publish,
         List<String> tags
 ) {}

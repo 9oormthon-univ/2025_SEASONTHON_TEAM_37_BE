@@ -9,7 +9,9 @@ import rebound.backend.category.entity.SubCategory;
 import rebound.backend.tag.entity.Tag;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -63,8 +65,9 @@ public class Post {
     @Builder.Default
     private Status status = Status.DRAFT; // 기본 초안
 
-    @Column(name = "image_url", length = 1000)
-    private String imageUrl;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<PostImage> postImages = new ArrayList<>();
 
     /** 1:1 연관관계 (PostContent가 FK 보유), Post 삭제 시 컨텐츠도 함께 제거 */
     @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -102,5 +105,10 @@ public class Post {
         var now = LocalDateTime.now();
         if (createdAt == null) createdAt = now;
         updatedAt = now;
+    }
+
+    public void addImage(PostImage postImage) {
+        this.postImages.add(postImage);
+        postImage.setPost(this);
     }
 }

@@ -45,9 +45,8 @@ public class PostController {
             @RequestParam(value = "failureContent", required = false) String failureContent,
             @RequestParam(value = "learningContent", required = false) String learningContent,
             @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
-            @RequestParam(value = "publish", required = false) Boolean publish,
             @RequestParam(value = "tags", required = false) List<String> tags,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
 
         // 서비스에 전달하기 위해 DTO를 조립합니다.
         PostCreateRequest request = new PostCreateRequest(
@@ -60,11 +59,10 @@ public class PostController {
                 failureContent,
                 learningContent,
                 nextStepContent,
-                publish,
                 tags
         );
 
-        PostResponse response = postService.createPostWithImage(request, file);
+        PostResponse response = postService.createPostWithImages(request, files);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -84,14 +82,14 @@ public class PostController {
             @RequestParam(value = "learningContent", required = false) String learningContent,
             @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
             @RequestParam(value = "tags", required = false) List<String> tags,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
 
         PostUpdateRequest request = new PostUpdateRequest(
                 mainCategory, subCategory, title, isAnonymous,
                 situationContent, failureContent, learningContent, nextStepContent, tags
         );
 
-        PostResponse response = postService.updatePost(postId, request, file);
+        PostResponse response = postService.updatePost(postId, request, files);
         return ResponseEntity.ok(response);
     }
 

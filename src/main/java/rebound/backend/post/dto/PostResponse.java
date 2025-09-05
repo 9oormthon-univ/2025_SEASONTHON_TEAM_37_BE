@@ -4,9 +4,11 @@ import lombok.Builder;
 import lombok.Getter;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
+import rebound.backend.post.entity.PostImage;
 import rebound.backend.tag.entity.Tag;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,7 +20,7 @@ public class PostResponse {
     private final String title;
     private final LocalDateTime createdAt;
     private final List<String> tags;
-    private final String imageUrl;
+    private final List<String> imageUrls;
     private final String authorNickname;
     private final CategoryDetail category;
     private final String situationContent;
@@ -59,6 +61,10 @@ public class PostResponse {
                 .map(Tag::getName)
                 .collect(Collectors.toList());
 
+        List<String> imageUrls = (post.getPostImages() != null)
+                ? post.getPostImages().stream().map(PostImage::getImageUrl).collect(Collectors.toList())
+                : Collections.emptyList();
+
         // PostContent가 null일 경우를 대비한 방어 코드
         PostContent content = post.getPostContent();
 
@@ -67,7 +73,7 @@ public class PostResponse {
                 .title(post.getTitle())
                 .createdAt(post.getCreatedAt())
                 .tags(tagNames)
-                .imageUrl(post.getImageUrl())
+                .imageUrls(imageUrls)
                 .authorNickname(authorNickname)
                 .category(CategoryDetail.from(post))
                 .situationContent(content != null ? content.getSituationContent() : null)

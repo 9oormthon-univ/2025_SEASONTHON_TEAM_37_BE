@@ -13,6 +13,7 @@ import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
+import rebound.backend.post.entity.PostImage;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
@@ -20,6 +21,7 @@ import rebound.backend.tag.repository.TagRepository;
 import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -57,17 +59,14 @@ public class PostService {
     /**
      * 게시글 생성 (이미지 포함)
      */
+    /**
+     * 게시글 생성 (여러 이미지 포함)
+     */
     @Transactional
-    public PostResponse createPostWithImage(PostCreateRequest request, MultipartFile file) throws IOException {
-        // SecurityContextHolder에서 현재 로그인한 사용자의 정보를 가져옴
+    public PostResponse createPostWithImages(PostCreateRequest request, List<MultipartFile> files) throws IOException {
         String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
         Member currentMember = memberRepository.findByLoginId(loginId)
                 .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
-
-        String imageUrl = null;
-        if (file != null && !file.isEmpty()) {
-            imageUrl = s3Service.uploadFile(file);
-        }
 
         PostContent postContent = PostContent.builder()
                 .situationContent(request.situationContent())
@@ -76,22 +75,26 @@ public class PostService {
                 .nextStepContent(request.nextStepContent())
                 .build();
 
-        Post.Status status = (request.publish() != null && request.publish())
-                ? Post.Status.PUBLIC
-                : Post.Status.DRAFT;
-
         Post post = Post.builder()
-                .memberId(currentMember.getId()) // JWT 토큰에서 조회한 사용자 ID 사용
-                .mainCategory(request.mainCategory())
-                .subCategory(request.subCategory())
-                .title(request.title())
-                .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
-                .imageUrl(imageUrl)
-                .status(status)
+                .memberId(currentMember.getId())
+                .mainCategory(request.mainCategory()).subCategory(request.subCategory())
+                .title(request.title()).isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
                 .build();
 
         post.setPostContent(postContent);
         postContent.setPost(post);
+
+        // 여러 이미지 업로드 및 PostImage 엔티티 생성/연결
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = s3Service.uploadFiles(files);
+            for (int i = 0; i < imageUrls.size(); i++) {
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrls.get(i))
+                        .imageOrder(i)
+                        .build();
+                post.addImage(postImage);
+            }
+        }
 
         if (request.tags() != null && !request.tags().isEmpty()) {
             request.tags().forEach(tagName -> {
@@ -110,18 +113,28 @@ public class PostService {
         return PostResponse.from(savedPost, finalNickname);
     }
 
+
+    /**
+     * 게시글 수정
+     */
     @Transactional
-    public PostResponse updatePost(Long postId, PostUpdateRequest request, MultipartFile file) throws IOException {
+    public PostResponse updatePost(Long postId, PostUpdateRequest request, List<MultipartFile> files) throws IOException {
         Post post = findPostById(postId);
         authorizePostAuthor(post);
-        // 이미지 파일이 새로 첨부된 경우, S3에 업로드하고 URL 업데이트
-        if (file != null && !file.isEmpty()) {
-            // 참고: 기존 S3 이미지를 삭제하는 로직을 S3Service에 추가하면 더 좋습니다.
-            String newImageUrl = s3Service.uploadFile(file);
-            post.setImageUrl(newImageUrl);
+
+        post.getPostImages().clear();
+
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = s3Service.uploadFiles(files);
+            for (int i = 0; i < imageUrls.size(); i++) {
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrls.get(i))
+                        .imageOrder(i)
+                        .build();
+                post.addImage(postImage);
+            }
         }
 
-        // DTO의 내용으로 게시글 필드 업데이트
         post.setMainCategory(request.mainCategory());
         post.setSubCategory(request.subCategory());
         post.setTitle(request.title());
@@ -133,10 +146,8 @@ public class PostService {
         postContent.setLearningContent(request.learningContent());
         postContent.setNextStepContent(request.nextStepContent());
 
-        // 태그 업데이트 (요청된 태그로 전체 교체)
         if (request.tags() != null) {
-            // Post 엔티티의 연관관계 편의 메서드를 사용하여 태그를 관리하는 것이 좋습니다.
-            post.getTags().clear(); // 이 방식은 orphanRemoval=true 옵션과 함께 사용 시 주의가 필요합니다.
+            post.getTags().clear();
             request.tags().forEach(tagName -> {
                 Tag tag = tagRepository.findByName(tagName)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
@@ -146,13 +157,10 @@ public class PostService {
 
         Member author = memberRepository.findById(post.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-
-        // 익명 여부에 따라 닉네임을 가공합니다.
         String finalNickname = post.getIsAnonymous()
                 ? NicknameMasker.mask(author.getNickname())
                 : author.getNickname();
 
-        // 최종적으로 모든 정보(닉네임, 카테고리 포함)를 담아 응답을 생성합니다.
         return PostResponse.from(post, finalNickname);
     }
 
