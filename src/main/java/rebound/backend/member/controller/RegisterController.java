@@ -1,5 +1,6 @@
 package rebound.backend.member.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
 import rebound.backend.member.dtos.requests.JoinRequest;
 import rebound.backend.member.dtos.responses.JoinResponse;
 import rebound.backend.member.dtos.requests.LoginRequest;
@@ -17,12 +18,14 @@ public class RegisterController {
 
     private final MemberService memberService;
 
+    @Operation(summary = "회원 가입", description = "loginId, 비밀번호, 닉네임, 나이, 직군을 받아 회원가입 / id 나 닉네임 중복시 오류")
     @PostMapping("/join")
     public ResponseEntity<JoinResponse> join(@Valid @RequestBody JoinRequest request) {
         JoinResponse response = memberService.join(request);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "로그인", description = "loginId, 비밀번호로 로그인하면 해당 회원의 id값과 토큰 반환")
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = memberService.login(request);
