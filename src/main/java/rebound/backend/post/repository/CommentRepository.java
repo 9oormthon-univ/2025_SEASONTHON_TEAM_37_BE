@@ -1,4 +1,3 @@
-// path: src/main/java/rebound/backend/post/repository/CommentRepository.java
 package rebound.backend.post.repository;
 
 import org.springframework.data.domain.Pageable;
@@ -34,4 +33,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
          where c.commentId = :id
     """)
     int softDelete(@Param("id") Long id);
+
+    // 마이페이지: 내가 댓글 단 게시글 목록 (postId 중복 제거, 최신댓글순)
+    @Query("""
+           select c.postId
+           from Comment c
+           where c.memberId = :memberId and c.status = :status
+           group by c.postId
+           order by max(c.createdAt) desc
+           """)
+    Slice<Long> findCommentedPostIds(@Param("memberId") Long memberId,
+                                     @Param("status") CommentStatus status,
+                                     Pageable pageable);
 }

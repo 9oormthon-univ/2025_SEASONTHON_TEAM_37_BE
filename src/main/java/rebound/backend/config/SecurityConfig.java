@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/comments/**").authenticated()
 
                         .requestMatchers("/api/v1/members/my/**").authenticated()
+                        .requestMatchers("/api/v1/mypage/**").authenticated()
 
                         .anyRequest().permitAll()
                 )
