@@ -11,4 +11,5 @@ public class MyInfoResponse {
     private String nickname;
     private int age;
     private String field;
+    private String imageUrl;
 }
