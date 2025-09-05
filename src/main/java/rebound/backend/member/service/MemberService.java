@@ -68,18 +68,14 @@ public class MemberService {
         return new LoginResponse(member.getLoginId(), token);
     }
 
-    public MyInfoResponse memberInfo(String auth) {
-        Long memberId = Long.valueOf(jwtUtil.getMemberIdFromToken(auth));
-
+    public MyInfoResponse memberInfo(Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
         return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField());
     }
 
-    public void memberInfoModify(MemberModifyRequest request, String token) {
-        Long memberId = Long.valueOf(jwtUtil.getMemberIdFromToken(token));
-
+    public void memberInfoModify(MemberModifyRequest request, Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
