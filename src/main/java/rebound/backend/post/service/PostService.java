@@ -209,6 +209,14 @@ public class PostService {
         return mapToPostResponsePage(posts);
     }
 
+    /**
+     * 인기순
+     */
+    public Page<PostResponse> getPopularPosts(Pageable pageable) {
+        Page<Post> posts = postRepository.findAllOrderByPopularity(null, pageable);
+        return mapToPostResponsePage(posts);
+    }
+
     @Transactional
     public void deletePost(Long postId) {
         Post post = findPostById(postId);

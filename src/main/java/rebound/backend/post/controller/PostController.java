@@ -86,4 +86,12 @@ public class PostController {
         Page<PostResponse> results = postService.searchPostsByKeyword(keyword, pageable);
         return ResponseEntity.ok(results);
     }
+
+    @Operation(summary = "인기순 게시글 목록 조회", description = "인기순으로 정렬된 게시글 목록을 조회합니다.")
+    @GetMapping("/popular")
+    public ResponseEntity<Page<PostResponse>> getPopularPosts(
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<PostResponse> results = postService.getPopularPosts(pageable);
+        return ResponseEntity.ok(results);
+    }
 }
