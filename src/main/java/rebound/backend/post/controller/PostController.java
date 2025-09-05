@@ -12,6 +12,7 @@ import rebound.backend.category.entity.SubCategory;
 import rebound.backend.post.dto.PostCreateRequest;
 import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
+import rebound.backend.post.entity.Post;
 import rebound.backend.post.service.PostService;
 
 import java.io.IOException;
@@ -69,7 +70,7 @@ public class PostController {
     /**
      * 게시글 수정
      */
-    @Operation(summary = "게시글 수정", description = "게시글의 내용과 이미지를 수정합니다.")
+    @Operation(summary = "게시글 수정", description = "게시글의 내용, 이미지, 상태 등을 한번에 수정합니다.")
     @PatchMapping(value = "/{postId}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<PostResponse> updatePost(
             @PathVariable Long postId,
@@ -82,11 +83,13 @@ public class PostController {
             @RequestParam(value = "learningContent", required = false) String learningContent,
             @RequestParam(value = "nextStepContent", required = false) String nextStepContent,
             @RequestParam(value = "tags", required = false) List<String> tags,
+            @RequestParam(value = "status", required = false) Post.Status status, // status 파라미터 추가
             @RequestPart(value = "files", required = false) List<MultipartFile> files) throws IOException {
 
+        // DTO 조립 시 status 포함
         PostUpdateRequest request = new PostUpdateRequest(
                 mainCategory, subCategory, title, isAnonymous,
-                situationContent, failureContent, learningContent, nextStepContent, tags
+                situationContent, failureContent, learningContent, nextStepContent, tags, status
         );
 
         PostResponse response = postService.updatePost(postId, request, files);
@@ -103,29 +106,5 @@ public class PostController {
         return ResponseEntity.noContent().build(); // 204 No Content 응답
     }
 
-    /**
-     * 기능 2: 임시 저장된 게시글 발행
-     */
-    @PatchMapping("/{postId}/publish")
-    public ResponseEntity<Void> publishPost(@PathVariable Long postId) {
-        postService.publishPost(postId);
-        return ResponseEntity.ok().build();
-    }
-    /**
-     * 기능 3: 게시글 '나만 보기' (HIDDEN 상태로 변경)
-     */
-    @PatchMapping("/{postId}/hide")
-    public ResponseEntity<Void> hidePost(@PathVariable Long postId) {
-        postService.hidePost(postId);
-        return ResponseEntity.ok().build();
-    }
-    /**
-     * 기능 4: '나만 보기' 게시글을 '전체 공개' (PUBLIC 상태로 변경)
-     */
-    @PatchMapping("/{postId}/unhide")
-    public ResponseEntity<Void> unhidePost(@PathVariable Long postId) {
-        postService.unhidePost(postId);
-        return ResponseEntity.ok().build();
-    }
 }
 

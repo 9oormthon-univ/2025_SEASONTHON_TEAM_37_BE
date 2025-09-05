@@ -122,30 +122,30 @@ public class PostService {
         Post post = findPostById(postId);
         authorizePostAuthor(post);
 
+        // 이미지 업데이트
         post.getPostImages().clear();
-
         if (files != null && !files.isEmpty()) {
             List<String> imageUrls = s3Service.uploadFiles(files);
             for (int i = 0; i < imageUrls.size(); i++) {
                 PostImage postImage = PostImage.builder()
                         .imageUrl(imageUrls.get(i))
-                        .imageOrder(i)
-                        .build();
+                        .imageOrder(i).build();
                 post.addImage(postImage);
             }
         }
 
+        // 내용 업데이트
         post.setMainCategory(request.mainCategory());
         post.setSubCategory(request.subCategory());
         post.setTitle(request.title());
         post.setIsAnonymous(request.isAnonymous());
-
         PostContent postContent = post.getPostContent();
         postContent.setSituationContent(request.situationContent());
         postContent.setFailureContent(request.failureContent());
         postContent.setLearningContent(request.learningContent());
         postContent.setNextStepContent(request.nextStepContent());
 
+        // 태그 업데이트
         if (request.tags() != null) {
             post.getTags().clear();
             request.tags().forEach(tagName -> {
@@ -155,14 +155,19 @@ public class PostService {
             });
         }
 
+        // 상태 변경 로직 통합
+        if (request.status() != null) {
+            post.setStatus(request.status());
+        }
+
         Member author = memberRepository.findById(post.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
         String finalNickname = post.getIsAnonymous()
                 ? NicknameMasker.mask(author.getNickname())
                 : author.getNickname();
-
         return PostResponse.from(post, finalNickname);
     }
+
 
     @Transactional
     public void deletePost(Long postId) {
@@ -171,48 +176,6 @@ public class PostService {
         postRepository.delete(post);
     }
 
-    /**
-     * 기능: 임시 저장된 글을 '발행' 상태로 변경
-     */
-    @Transactional
-    public void publishPost(Long postId) {
-        Post post = findPostById(postId);
-        authorizePostAuthor(post);
-
-        // 이미 발행된 글은 다시 발행할 수 없도록 방어
-        if (post.getStatus() != Post.Status.DRAFT) {
-            throw new IllegalStateException("임시 저장 상태의 게시글만 발행할 수 있습니다.");
-        }
-
-        // 상태를 PUBLIC으로 변경
-        post.setStatus(Post.Status.PUBLIC);
-    }
-
-    @Transactional
-    public void hidePost(Long postId) {
-        Post post = findPostById(postId);
-        authorizePostAuthor(post);
-
-        // 공개된 게시글만 '나만 보기'로 변경 가능
-        if (post.getStatus() != Post.Status.PUBLIC) {
-            throw new IllegalStateException("공개 상태의 게시글만 '나만 보기'로 변경할 수 있습니다.");
-        }
-
-        post.setStatus(Post.Status.HIDDEN);
-    }
-
-    @Transactional
-    public void unhidePost(Long postId) {
-        Post post = findPostById(postId);
-        authorizePostAuthor(post);
-
-        // '나만 보기' 상태의 게시글만 '전체 공개'로 변경 가능
-        if (post.getStatus() != Post.Status.HIDDEN) {
-            throw new IllegalStateException("'나만 보기' 상태의 게시글만 '전체 공개'로 변경할 수 있습니다.");
-        }
-
-        post.setStatus(Post.Status.PUBLIC);
-    }
 
     private void authorizePostAuthor(Post post) {
         String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
