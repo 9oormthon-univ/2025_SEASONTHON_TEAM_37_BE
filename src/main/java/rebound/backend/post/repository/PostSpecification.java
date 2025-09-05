@@ -49,5 +49,13 @@ public class PostSpecification {
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.equal(root.get("subCategory"), subCategory);
     }
+
+    /**
+     * 특정 memberId를 가진 게시글을 찾는 조건을 생성합니다.
+     */
+    public static Specification<Post> hasMemberId(Long memberId) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("memberId"), memberId);
+    }
 }
 
