@@ -27,19 +27,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String authorizationHeader = request.getHeader("Authorization");
 
-        String loginId = null;
+        String memberId = null;
         String jwt = null;
 
         //헤더가 존재하고, "Bearer" 로 시작하는지 확인
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
-            loginId = jwtUtil.getMemberIdFromToken(jwt);
+            memberId = jwtUtil.getMemberIdFromToken(jwt);
         }
 
         //로그인 ID가 존재하고, 현재 SecurityContext에 인증 정보가 없는 경우
-        if (loginId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (memberId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(loginId);
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(memberId);
 
             //토큰 유효 확인
             if (jwtUtil.validateToken(jwt, userDetails)) {

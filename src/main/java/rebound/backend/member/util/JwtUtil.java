@@ -50,10 +50,10 @@ public class JwtUtil {
     // ✅ [수정] 사용자 정보를 함께 검증하는 validateToken 메서드
     public boolean validateToken(String token, UserDetails userDetails) {
         try {
-            final String loginIdFromToken = getMemberIdFromToken(token);
+            final String memberIdFromToken = getMemberIdFromToken(token);
             // 1. 토큰의 사용자 정보와 DB에서 가져온 사용자 정보가 일치하는지 확인
             // 2. 토큰이 만료되었는지 확인
-            return loginIdFromToken.equals(userDetails.getUsername()) && !isTokenExpired(token);
+            return memberIdFromToken.equals(userDetails.getUsername()) && !isTokenExpired(token);
         } catch (Exception e) {
             // 그 외 모든 예외는 유효하지 않은 토큰으로 처리
             return false;
