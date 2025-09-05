@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -46,14 +47,36 @@ public class JwtUtil {
         return claims.getSubject();
     }
 
-    //토큰 유효성 검증
-    public boolean validateToken(String token) {
+    // ✅ [수정] 사용자 정보를 함께 검증하는 validateToken 메서드
+    public boolean validateToken(String token, UserDetails userDetails) {
         try {
-            Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token);
-            return true;
+            final String loginIdFromToken = getLoginIdFromToken(token);
+            // 1. 토큰의 사용자 정보와 DB에서 가져온 사용자 정보가 일치하는지 확인
+            // 2. 토큰이 만료되었는지 확인
+            return loginIdFromToken.equals(userDetails.getUsername()) && !isTokenExpired(token);
         } catch (Exception e) {
-            //예외 발생시 유효하지 않은 토큰이다(만료 or 서명오류 등등)
+            // 그 외 모든 예외는 유효하지 않은 토큰으로 처리
             return false;
         }
     }
+
+    // 토큰의 만료 여부만 확인하는 private 메서드
+    private boolean isTokenExpired(String token) {
+        final Date expiration = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getExpiration();
+        return expiration.before(new Date());
+    }
+
+//    public boolean validateToken(String token) {
+//        try {
+//            Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token);
+//            return true;
+//        } catch (Exception e) {
+//            return false;
+//        }
+//    }
 }

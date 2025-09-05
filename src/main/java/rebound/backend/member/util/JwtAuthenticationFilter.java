@@ -7,19 +7,19 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import rebound.backend.member.service.UserDetailsServiceImpl;
 
 import java.io.IOException;
-import java.util.Collections;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -38,10 +38,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         //로그인 ID가 존재하고, 현재 SecurityContext에 인증 정보가 없는 경우
         if (loginId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(loginId);
+
             //토큰 유효 확인
-            if (jwtUtil.validateToken(jwt)) {
-                //UserDetails 객체 생성(비밀번호 불필요)
-                UserDetails userDetails = new User(loginId, "", Collections.emptyList());
+            if (jwtUtil.validateToken(jwt, userDetails)) {
 
                 //인증 토큰 생성
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
