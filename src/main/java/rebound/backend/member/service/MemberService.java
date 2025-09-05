@@ -1,19 +1,24 @@
 package rebound.backend.member.service;
 
+import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.member.domain.Member;
+import rebound.backend.member.domain.MemberImage;
 import rebound.backend.member.dtos.requests.JoinRequest;
 import rebound.backend.member.dtos.requests.MemberModifyRequest;
 import rebound.backend.member.dtos.responses.JoinResponse;
 import rebound.backend.member.dtos.requests.LoginRequest;
 import rebound.backend.member.dtos.responses.LoginResponse;
 import rebound.backend.member.dtos.responses.MyInfoResponse;
+import rebound.backend.member.repository.MemberImageRepository;
 import rebound.backend.member.repository.MemberRepository;
 import rebound.backend.member.util.JwtUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import rebound.backend.s3.service.S3Service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 
 @Service
@@ -24,6 +29,8 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final S3Service s3Service;
+    private final MemberImageRepository memberImageRepository;
 
     public JoinResponse join(JoinRequest joinRequest) {
         //loginId 중복 검사
@@ -72,10 +79,24 @@ public class MemberService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
-        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField());
+        MemberImage memberImage = null; //최초 회원가입으로 이미지가 없을 경우 null
+
+        if (memberImageRepository.findImageByMemberId(member.getId()).isPresent()) {
+            //이미지가 있으면 출력
+            memberImage = memberImageRepository.findImageByMemberId(member.getId()).get();
+        }
+
+        String imageUrl;
+        if (memberImage != null) {
+            imageUrl = memberImage.getImageUrl(); //프로필 이미지가 있으면 url 출력
+        } else {
+            imageUrl = ""; //없으면 빈 문자열
+        }
+
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl);
     }
 
-    public void memberInfoModify(MemberModifyRequest request, Long memberId) {
+    public void memberInfoModify(MemberModifyRequest request, MultipartFile modifyImage, Long memberId) throws IOException {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
@@ -88,6 +109,34 @@ public class MemberService {
                 .password_hash(member.getPassword_hash())
                 .createdAt(member.getCreatedAt())
                 .build();
+
+        //프로필 이미지가 들어온 경우,
+        if (modifyImage != null) {
+            if (memberImageRepository.findImageByMemberId(member.getId()).isPresent()) { //기존 이미지가 존재하면,
+                MemberImage originImage = memberImageRepository.findImageByMemberId(member.getId()).get();
+                memberImageRepository.delete(originImage); //기존 이미지 엔티티 삭제
+
+                String editImageUrl = s3Service.uploadFile(modifyImage);
+
+                MemberImage editImage = MemberImage.builder()
+                        .imageUrl(editImageUrl)
+                        .member(member)
+                        .build();
+
+                memberImageRepository.save(editImage); //프로필 이미지 추가
+            }
+
+            if (memberImageRepository.findImageByMemberId(member.getId()).isEmpty()) { //기존 이미지 없으면,
+                String newImageUrl = s3Service.uploadFile(modifyImage);
+
+                MemberImage newImage = MemberImage.builder()
+                        .imageUrl(newImageUrl)
+                        .member(member)
+                        .build();
+
+                memberImageRepository.save(newImage); //기존 이미지 제거 없이 추가
+            }
+        }
 
         memberRepository.save(editMember);
     }
