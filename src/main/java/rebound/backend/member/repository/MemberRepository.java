@@ -21,4 +21,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     WHERE m.nickname = :nickname
     """)
     Optional<Member> findByNickname(@Param("nickname") String nickname);
+
+    @Override
+    Optional<Member> findById(Long aLong);
 }

@@ -2,9 +2,11 @@ package rebound.backend.member.service;
 
 import rebound.backend.member.domain.Member;
 import rebound.backend.member.dtos.requests.JoinRequest;
+import rebound.backend.member.dtos.requests.MemberModifyRequest;
 import rebound.backend.member.dtos.responses.JoinResponse;
 import rebound.backend.member.dtos.requests.LoginRequest;
 import rebound.backend.member.dtos.responses.LoginResponse;
+import rebound.backend.member.dtos.responses.MyInfoResponse;
 import rebound.backend.member.repository.MemberRepository;
 import rebound.backend.member.util.JwtUtil;
 import jakarta.transaction.Transactional;
@@ -64,5 +66,33 @@ public class MemberService {
         String token = jwtUtil.createToken(member.getId());
 
         return new LoginResponse(member.getLoginId(), token);
+    }
+
+    public MyInfoResponse memberInfo(String auth) {
+        Long memberId = Long.valueOf(jwtUtil.getMemberIdFromToken(auth));
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
+
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField());
+    }
+
+    public void memberInfoModify(MemberModifyRequest request, String token) {
+        Long memberId = Long.valueOf(jwtUtil.getMemberIdFromToken(token));
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
+
+        Member editMember = Member.builder()
+                .id(member.getId())
+                .nickname(request.getNickname())
+                .age(request.getAge())
+                .field(request.getField())
+                .loginId(member.getLoginId())
+                .password_hash(member.getPassword_hash())
+                .createdAt(member.getCreatedAt())
+                .build();
+
+        memberRepository.save(editMember);
     }
 }
