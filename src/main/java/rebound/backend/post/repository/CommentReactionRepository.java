@@ -6,4 +6,5 @@ import rebound.backend.post.entity.ReactionType;
 public interface CommentReactionRepository extends JpaRepository<CommentReaction, Long> {
     boolean existsByCommentIdAndMemberIdAndType(Long cId, Long mId, ReactionType t);
     long deleteByCommentIdAndMemberIdAndType(Long cId, Long mId, ReactionType t);
+    long countByCommentIdAndType(Long cId, ReactionType t); // 집계용
 }
