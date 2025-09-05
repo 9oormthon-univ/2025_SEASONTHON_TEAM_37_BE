@@ -143,12 +143,11 @@ public class PostService {
      * 내가 쓴 글 목록 조회
      */
     public Page<PostResponse> getMyPosts(Pageable pageable) {
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Member currentMember = memberRepository.findByLoginId(loginId)
-                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+        Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
 
-        Specification<Post> spec = PostSpecification.hasMemberId(currentMember.getId());
+        Specification<Post> spec = PostSpecification.hasMemberId(currentMemberId);
         Page<Post> posts = postRepository.findAll(spec, pageable);
+
         return mapToPostResponsePage(posts);
     }
 
