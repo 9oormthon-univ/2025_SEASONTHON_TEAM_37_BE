@@ -25,6 +25,7 @@ import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
 import rebound.backend.utils.NicknameMasker;
+import rebound.backend.utils.InteractionAuth;
 
 import java.io.IOException;
 import java.util.List;
@@ -42,31 +43,71 @@ public class PostService {
     private final MemberRepository memberRepository;
 
     /**
-     * 카테고리별 게시글 목록 조회
+     * 통합 게시글 목록 조회 (다양한 필터링 옵션 지원)
      */
-    public Page<PostResponse> getPosts(MainCategory mainCategory, SubCategory subCategory, Pageable pageable) {
-        if (subCategory == null) {
-            return Page.empty(pageable);
+    public Page<PostResponse> getPosts(
+            MainCategory mainCategory, 
+            SubCategory subCategory, 
+            String keyword, 
+            String sort, 
+            String filter, 
+            Pageable pageable) {
+        
+        Specification<Post> spec = (root, query, criteriaBuilder) -> null;
+        
+        // 카테고리 필터링
+        if (subCategory != null) {
+            spec = spec.and(PostSpecification.hasSubCategory(subCategory));
         }
-
-        Specification<Post> spec = PostSpecification.hasSubCategory(subCategory);
-
         if (mainCategory != null) {
             spec = spec.and(PostSpecification.hasMainCategory(mainCategory));
         }
-
+        
+        // 키워드 검색
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            spec = spec.and(PostSpecification.searchByKeyword(keyword));
+        }
+        
+        // 개인 필터링 (인증된 사용자만)
+        if (filter != null && !filter.trim().isEmpty()) {
+            try {
+                Long currentMemberId = InteractionAuth.currentMemberId();
+                
+                switch (filter.toLowerCase()) {
+                    case "my_posts":
+                        spec = spec.and(PostSpecification.hasAuthor(currentMemberId));
+                        break;
+                    case "my_likes":
+                        spec = spec.and(PostSpecification.likedByMember(currentMemberId));
+                        break;
+                    case "my_comments":
+                        spec = spec.and(PostSpecification.commentedByMember(currentMemberId));
+                        break;
+                    case "my_bookmarks":
+                        spec = spec.and(PostSpecification.bookmarkedByMember(currentMemberId));
+                        break;
+                    default:
+                        // 알 수 없는 필터는 무시
+                        break;
+                }
+            } catch (Exception e) {
+                // 인증되지 않은 사용자는 개인 필터를 사용할 수 없음
+                throw new IllegalArgumentException("개인 필터를 사용하려면 로그인이 필요합니다.");
+            }
+        }
+        
         Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
     }
 
-
     /**
-     * 최신 게시글 목록 조회
+     * 카테고리별 게시글 목록 조회 (기존 메서드 - 하위 호환성 유지)
      */
-    public Page<PostResponse> getRecentPosts(Pageable pageable) {
-        Page<Post> posts = postRepository.findAll(pageable);
-        return mapToPostResponsePage(posts);
+    public Page<PostResponse> getPosts(MainCategory mainCategory, SubCategory subCategory, Pageable pageable) {
+        return getPosts(mainCategory, subCategory, null, null, null, pageable);
     }
+
+
 
     /**
      * 게시글 상세 조회
@@ -193,34 +234,6 @@ public class PostService {
     }
 
 
-    /**
-     * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
-     */
-    public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
-        // 1. Specification 객체를 생성하여 검색 조건을 정의합니다.
-        Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
-
-        // 2. Repository에서 조건에 맞는 게시글 목록을 페이징하여 조회합니다.
-        Page<Post> posts = postRepository.findAll(spec, pageable);
-
-        // 3. N+1 문제를 방지하기 위해 작성자 정보를 한 번에 조회합니다.
-        List<Long> authorIds = posts.getContent().stream()
-                .map(Post::getMemberId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(Member::getId, member -> member));
-
-        // 4. 조회된 Post 목록을 PostResponse DTO로 변환합니다.
-        return posts.map(post -> {
-            Member author = authors.get(post.getMemberId());
-            String nickname = (author != null) ? author.getNickname() : "알 수 없는 사용자";
-            String finalNickname = post.getIsAnonymous() ? NicknameMasker.mask(nickname) : nickname;
-            // PostSummaryResponse 대신 PostResponse.from을 호출합니다.
-            return PostResponse.from(post, finalNickname);
-        });
-    }
 
     @Transactional
     public void deletePost(Long postId) {
