@@ -8,7 +8,6 @@ import rebound.backend.category.entity.SubCategory;
 import java.util.List;
 
 public record PostCreateRequest(
-        @NotNull Long memberId,
         @NotNull MainCategory mainCategory,
         @NotNull SubCategory subCategory,
         @NotBlank String title,
@@ -20,6 +19,5 @@ public record PostCreateRequest(
         String learningContent,
         String nextStepContent,
 
-        Boolean publish,
         List<String> tags
 ) {}

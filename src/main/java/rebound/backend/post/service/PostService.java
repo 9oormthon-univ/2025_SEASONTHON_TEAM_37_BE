@@ -1,20 +1,27 @@
 package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import rebound.backend.member.domain.Member;
+import rebound.backend.member.repository.MemberRepository;
 import rebound.backend.post.dto.PostCreateRequest;
 import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
+import rebound.backend.post.entity.PostImage;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
+import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,19 +31,43 @@ public class PostService {
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
     private final S3Service s3Service;
+    private final MemberRepository memberRepository;
 
     /**
-     * 기능: 새 글을 '발행' 또는 '임시 저장' 상태로 생성
+     * 게시글 상세 조회 (익명 닉네임 처리 기능 포함)
      */
-    @Transactional
-    public PostResponse createPostWithImage(PostCreateRequest request, MultipartFile file) throws IOException {
-        String imageUrl = null;
-        // 1. 파일이 존재하는 경우에만 S3에 업로드하고 URL을 가져옵니다.
-        if (file != null && !file.isEmpty()) {
-            imageUrl = s3Service.uploadFile(file);
+    public PostResponse getPostDetails(Long postId) {
+        Post post = findPostById(postId);
+
+        // memberId로 작성자 Member 엔티티를 조회
+        Member author = memberRepository.findById(post.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
+
+        String finalNickname;
+        if (post.getIsAnonymous()) {
+            // 익명일 경우, NicknameMasker를 사용해 닉네임을 마스킹합니다.
+            finalNickname = NicknameMasker.mask(author.getNickname());
+        } else {
+            // 익명이 아닐 경우, 원래 닉네임을 그대로 사용합니다.
+            finalNickname = author.getNickname();
         }
 
-        // 2. 게시글 컨텐츠를 생성합니다.
+        // 최종적으로 가공된 닉네임을 DTO에 담아 반환합니다.
+        return PostResponse.from(post, finalNickname);
+    }
+
+    /**
+     * 게시글 생성 (이미지 포함)
+     */
+    /**
+     * 게시글 생성 (여러 이미지 포함)
+     */
+    @Transactional
+    public PostResponse createPostWithImages(PostCreateRequest request, List<MultipartFile> files) throws IOException {
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Member currentMember = memberRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
         PostContent postContent = PostContent.builder()
                 .situationContent(request.situationContent())
                 .failureContent(request.failureContent())
@@ -44,66 +75,28 @@ public class PostService {
                 .nextStepContent(request.nextStepContent())
                 .build();
 
-        Post.Status status = (request.publish() != null && request.publish())
-                ? Post.Status.PUBLIC
-                : Post.Status.DRAFT;
-
-        // 3. 태그를 제외한 Post 엔티티를 먼저 생성합니다.
         Post post = Post.builder()
-                .memberId(request.memberId())
-                .mainCategory(request.mainCategory())
-                .subCategory(request.subCategory())
-                .title(request.title())
-                .isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
-                .imageUrl(imageUrl) // S3에서 받은 이미지 URL 저장
-                .status(status)
+                .memberId(currentMember.getId())
+                .mainCategory(request.mainCategory()).subCategory(request.subCategory())
+                .title(request.title()).isAnonymous(request.isAnonymous() != null ? request.isAnonymous() : Boolean.FALSE)
                 .build();
 
         post.setPostContent(postContent);
         postContent.setPost(post);
 
-        // 4. 태그들을 조회하거나 생성한 후, Post에 하나씩 명시적으로 추가합니다.
+        // 여러 이미지 업로드 및 PostImage 엔티티 생성/연결
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = s3Service.uploadFiles(files);
+            for (int i = 0; i < imageUrls.size(); i++) {
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrls.get(i))
+                        .imageOrder(i)
+                        .build();
+                post.addImage(postImage);
+            }
+        }
+
         if (request.tags() != null && !request.tags().isEmpty()) {
-            request.tags().forEach(tagName -> {
-                Tag tag = tagRepository.findByName(tagName)
-                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
-                post.addTag(tag); // 연관관계 편의 메서드 사용
-            });
-        }
-
-        Post savedPost = postRepository.save(post);
-
-        return PostResponse.from(savedPost);
-    }
-
-    @Transactional
-    public PostResponse updatePost(Long postId, PostUpdateRequest request, MultipartFile file) throws IOException {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
-        Post post = findPostById(postId);
-
-        // 이미지 파일이 새로 첨부된 경우, S3에 업로드하고 URL 업데이트
-        if (file != null && !file.isEmpty()) {
-            // 참고: 기존 S3 이미지를 삭제하는 로직을 S3Service에 추가하면 더 좋습니다.
-            String newImageUrl = s3Service.uploadFile(file);
-            post.setImageUrl(newImageUrl);
-        }
-
-        // DTO의 내용으로 게시글 필드 업데이트
-        post.setMainCategory(request.mainCategory());
-        post.setSubCategory(request.subCategory());
-        post.setTitle(request.title());
-        post.setIsAnonymous(request.isAnonymous());
-
-        PostContent postContent = post.getPostContent();
-        postContent.setSituationContent(request.situationContent());
-        postContent.setFailureContent(request.failureContent());
-        postContent.setLearningContent(request.learningContent());
-        postContent.setNextStepContent(request.nextStepContent());
-
-        // 태그 업데이트 (요청된 태그로 전체 교체)
-        if (request.tags() != null) {
-            // Post 엔티티의 연관관계 편의 메서드를 사용하여 태그를 관리하는 것이 좋습니다.
-            post.getTags().clear(); // 이 방식은 orphanRemoval=true 옵션과 함께 사용 시 주의가 필요합니다.
             request.tags().forEach(tagName -> {
                 Tag tag = tagRepository.findByName(tagName)
                         .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
@@ -111,60 +104,87 @@ public class PostService {
             });
         }
 
-        return PostResponse.from(post); // 변경 감지(Dirty Checking)에 의해 자동 업데이트
+        Post savedPost = postRepository.save(post);
+
+        String finalNickname = savedPost.getIsAnonymous()
+                ? NicknameMasker.mask(currentMember.getNickname())
+                : currentMember.getNickname();
+
+        return PostResponse.from(savedPost, finalNickname);
     }
+
+
+    /**
+     * 게시글 수정
+     */
+    @Transactional
+    public PostResponse updatePost(Long postId, PostUpdateRequest request, List<MultipartFile> files) throws IOException {
+        Post post = findPostById(postId);
+        authorizePostAuthor(post);
+
+        // 이미지 업데이트
+        post.getPostImages().clear();
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = s3Service.uploadFiles(files);
+            for (int i = 0; i < imageUrls.size(); i++) {
+                PostImage postImage = PostImage.builder()
+                        .imageUrl(imageUrls.get(i))
+                        .imageOrder(i).build();
+                post.addImage(postImage);
+            }
+        }
+
+        // 내용 업데이트
+        post.setMainCategory(request.mainCategory());
+        post.setSubCategory(request.subCategory());
+        post.setTitle(request.title());
+        post.setIsAnonymous(request.isAnonymous());
+        PostContent postContent = post.getPostContent();
+        postContent.setSituationContent(request.situationContent());
+        postContent.setFailureContent(request.failureContent());
+        postContent.setLearningContent(request.learningContent());
+        postContent.setNextStepContent(request.nextStepContent());
+
+        // 태그 업데이트
+        if (request.tags() != null) {
+            post.getTags().clear();
+            request.tags().forEach(tagName -> {
+                Tag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(Tag.builder().name(tagName).build()));
+                post.addTag(tag);
+            });
+        }
+
+        // 상태 변경 로직 통합
+        if (request.status() != null) {
+            post.setStatus(request.status());
+        }
+
+        Member author = memberRepository.findById(post.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
+        String finalNickname = post.getIsAnonymous()
+                ? NicknameMasker.mask(author.getNickname())
+                : author.getNickname();
+        return PostResponse.from(post, finalNickname);
+    }
+
 
     @Transactional
     public void deletePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가 필요
         Post post = findPostById(postId);
+        authorizePostAuthor(post);
         postRepository.delete(post);
     }
 
-    /**
-     * 기능: 임시 저장된 글을 '발행' 상태로 변경
-     */
-    @Transactional
-    public void publishPost(Long postId) {
-        // TODO: 나중에 JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가하면 좋습니다.
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
 
-        // 이미 발행된 글은 다시 발행할 수 없도록 방어
-        if (post.getStatus() != Post.Status.DRAFT) {
-            throw new IllegalStateException("임시 저장 상태의 게시글만 발행할 수 있습니다.");
+    private void authorizePostAuthor(Post post) {
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Member currentMember = memberRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
+        if (!post.getMemberId().equals(currentMember.getId())) {
+            throw new AccessDeniedException("해당 게시글에 대한 수정/삭제 권한이 없습니다.");
         }
-
-        // 상태를 PUBLIC으로 변경
-        post.setStatus(Post.Status.PUBLIC);
-    }
-
-    @Transactional
-    public void hidePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
-
-        // 공개된 게시글만 '나만 보기'로 변경 가능
-        if (post.getStatus() != Post.Status.PUBLIC) {
-            throw new IllegalStateException("공개 상태의 게시글만 '나만 보기'로 변경할 수 있습니다.");
-        }
-
-        post.setStatus(Post.Status.HIDDEN);
-    }
-
-    @Transactional
-    public void unhidePost(Long postId) {
-        // TODO: JWT 토큰 등에서 회원 ID를 가져와서, 본인이 쓴 글이 맞는지 확인하는 로직 추가
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
-
-        // '나만 보기' 상태의 게시글만 '전체 공개'로 변경 가능
-        if (post.getStatus() != Post.Status.HIDDEN) {
-            throw new IllegalStateException("'나만 보기' 상태의 게시글만 '전체 공개'로 변경할 수 있습니다.");
-        }
-
-        post.setStatus(Post.Status.PUBLIC);
     }
 
     public Post findPostById(Long postId) {
