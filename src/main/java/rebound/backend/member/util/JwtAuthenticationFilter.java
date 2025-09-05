@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         //헤더가 존재하고, "Bearer" 로 시작하는지 확인
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
-            loginId = jwtUtil.getLoginIdFromToken(jwt);
+            loginId = jwtUtil.getMemberIdFromToken(jwt);
         }
 
         //로그인 ID가 존재하고, 현재 SecurityContext에 인증 정보가 없는 경우

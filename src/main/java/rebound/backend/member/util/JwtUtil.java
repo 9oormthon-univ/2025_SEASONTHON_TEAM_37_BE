@@ -36,8 +36,8 @@ public class JwtUtil {
                 .compact();
     }
 
-    //토큰에서 로그인 ID 추출
-    public String getLoginIdFromToken(String token) {
+    //토큰에서 회원 Id 추출
+    public String getMemberIdFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(secretKey)
                 .build()
@@ -50,7 +50,7 @@ public class JwtUtil {
     // ✅ [수정] 사용자 정보를 함께 검증하는 validateToken 메서드
     public boolean validateToken(String token, UserDetails userDetails) {
         try {
-            final String loginIdFromToken = getLoginIdFromToken(token);
+            final String loginIdFromToken = getMemberIdFromToken(token);
             // 1. 토큰의 사용자 정보와 DB에서 가져온 사용자 정보가 일치하는지 확인
             // 2. 토큰이 만료되었는지 확인
             return loginIdFromToken.equals(userDetails.getUsername()) && !isTokenExpired(token);
