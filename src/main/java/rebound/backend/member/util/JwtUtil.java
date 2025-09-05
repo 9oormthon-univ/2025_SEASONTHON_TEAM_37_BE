@@ -24,12 +24,12 @@ public class JwtUtil {
     }
 
     //로그인 ID 를 받아 JWT 토큰 생성
-    public String createToken(String loginId) {
+    public String createToken(Long memberId) {
         Date now= new Date();
         Date expirationDate = new Date(now.getTime() + expirationHours * 60 * 60 * 1000);
 
         return Jwts.builder()
-                .setSubject(loginId)
+                .setSubject(memberId.toString())
                 .setIssuedAt(now)
                 .setExpiration(expirationDate)
                 .signWith(secretKey, SignatureAlgorithm.HS256)

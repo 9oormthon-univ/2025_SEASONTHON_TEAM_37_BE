@@ -61,7 +61,7 @@ public class MemberService {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다");
         }
 
-        String token = jwtUtil.createToken(member.getLoginId());
+        String token = jwtUtil.createToken(member.getId());
 
         return new LoginResponse(member.getLoginId(), token);
     }
