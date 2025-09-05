@@ -8,7 +8,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
 import rebound.backend.member.domain.Member;
@@ -18,13 +17,10 @@ import rebound.backend.post.dto.PostResponse;
 import rebound.backend.post.dto.PostUpdateRequest;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
-import rebound.backend.post.entity.PostImage;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.post.repository.PostSpecification;
-import rebound.backend.s3.service.S3Service;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
-import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
 import java.util.List;
@@ -38,7 +34,6 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final TagRepository tagRepository;
-    private final S3Service s3Service;
     private final MemberRepository memberRepository;
 
     /**
