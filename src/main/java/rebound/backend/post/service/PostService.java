@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,9 @@ import rebound.backend.post.dto.PostUpdateRequest;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
 import rebound.backend.post.entity.PostImage;
+import rebound.backend.post.entity.ReactionType;
+import rebound.backend.post.repository.PostBookmarkRepository;
+import rebound.backend.post.repository.PostReactionRepository;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.post.repository.PostSpecification;
 import rebound.backend.s3.service.S3Service;
@@ -27,8 +31,7 @@ import rebound.backend.tag.repository.TagRepository;
 import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +43,11 @@ public class PostService {
     private final TagRepository tagRepository;
     private final S3Service s3Service;
     private final MemberRepository memberRepository;
+
+    private final PostReactionRepository postReactionRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
+    private final CommentRepository commentRepository;
+
 
     /**
      * 카테고리별 게시글 목록 조회
@@ -74,8 +82,20 @@ public class PostService {
     public PostResponse getPostDetails(Long postId) {
         Post post = findPostById(postId);
         Member author = memberRepository.findById(post.getMemberId())
-                .orElse(null); // 탈퇴한 회원의 경우를 대비해 null 처리
-        return PostResponse.from(post, author);
+                .orElse(null);
+
+        // 좋아요/스크랩 카운트 + 내 상태 추가
+        long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
+        long bookmarkCount = postBookmarkRepository.countByPostId(postId);
+
+        Long me = currentMemberIdOrNull();
+        boolean liked = false, bookmarked = false;
+        if (me != null) {
+            liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
+            bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
+        }
+
+        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
     }
 
     /**
@@ -113,16 +133,13 @@ public class PostService {
         return PostResponse.from(savedPost, currentMember);
     }
 
-
     /**
      * 내가 쓴 글 목록 조회
      */
     public Page<PostResponse> getMyPosts(Pageable pageable) {
         Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
-
         Specification<Post> spec = PostSpecification.hasMemberId(currentMemberId);
         Page<Post> posts = postRepository.findAll(spec, pageable);
-
         return mapToPostResponsePage(posts);
     }
 
@@ -160,10 +177,18 @@ public class PostService {
         }
         Member author = memberRepository.findById(post.getMemberId())
                 .orElseThrow(() -> new IllegalArgumentException("작성자 정보를 찾을 수 없습니다."));
-        return PostResponse.from(post, author);
+
+        // 수정 후 최신 인터랙션 반영
+        long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
+        long bookmarkCount = postBookmarkRepository.countByPostId(postId);
+        Long me = currentMemberIdOrNull();
+        boolean liked = false, bookmarked = false;
+        if (me != null) {
+            liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
+            bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
+        }
+        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
     }
-
-
 
     /**
      * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
@@ -180,7 +205,6 @@ public class PostService {
         authorizePostAuthor(post);
         postRepository.delete(post);
     }
-
 
     private void authorizePostAuthor(Post post) {
         Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
@@ -203,9 +227,30 @@ public class PostService {
         Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
                 .collect(Collectors.toMap(Member::getId, member -> member));
 
+        Long me = currentMemberIdOrNull();
+
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
-            return PostResponse.from(post, author);
+
+            // 단건 집계(페이지 크기만큼)
+            long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
+            long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
+
+            boolean liked = false, bookmarked = false;
+            if (me != null) {
+                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), me, ReactionType.HEART);
+                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), me);
+            }
+
+            return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
         });
+    }
+
+    // 현재 로그인한 memberId (없으면 null) 추가
+    private Long currentMemberIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) return null;
+        String loginId = auth.getName();
+        return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
     }
 }

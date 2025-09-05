@@ -11,6 +11,8 @@ import rebound.backend.post.repository.PostBookmarkRepository;
 import rebound.backend.post.repository.PostReactionRepository;
 import rebound.backend.utils.InteractionAuth;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class MypageInteractionService {
