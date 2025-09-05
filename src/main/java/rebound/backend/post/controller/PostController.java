@@ -2,6 +2,10 @@ package rebound.backend.post.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +28,24 @@ import java.util.List;
 public class PostController {
 
     private final PostService postService;
+
+    @Operation(summary = "카테고리별 게시글 목록 조회", description = "소분류(subCategory)를 기준으로 게시글 목록을 조회합니다.")
+    @GetMapping
+    public ResponseEntity<Page<PostResponse>> getPosts(
+            @RequestParam(value = "mainCategory", required = false) MainCategory mainCategory,
+            @RequestParam(value = "subCategory") SubCategory subCategory,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<PostResponse> results = postService.getPosts(mainCategory, subCategory, pageable);
+        return ResponseEntity.ok(results);
+    }
+
+    @Operation(summary = "최신 게시글 목록 조회", description = "최신순으로 정렬된 게시글 목록을 조회합니다.")
+    @GetMapping("/recent")
+    public ResponseEntity<Page<PostResponse>> getRecentPosts(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<PostResponse> results = postService.getRecentPosts(pageable);
+        return ResponseEntity.ok(results);
+    }
 
     @Operation(summary = "게시글 상세 조회")
     @GetMapping("/{postId}")
@@ -106,5 +128,13 @@ public class PostController {
         return ResponseEntity.noContent().build(); // 204 No Content 응답
     }
 
+    @Operation(summary = "게시글 검색", description = "키워드를 사용하여 제목, 내용, 태그에서 게시글을 검색합니다.")
+    @GetMapping("/search")
+    public ResponseEntity<Page<PostResponse>> searchPosts(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<PostResponse> results = postService.searchPostsByKeyword(keyword, pageable);
+        return ResponseEntity.ok(results);
+    }
 }
 
