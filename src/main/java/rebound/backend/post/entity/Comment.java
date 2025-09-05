@@ -10,7 +10,7 @@ import java.time.Instant;
         indexes = {
                 @Index(name="ix_comment_post", columnList="post_id"),
                 @Index(name="ix_comment_parent", columnList="parent_comment_id"),
-                @Index(name = "ix_comment_post_created", columnList = "post_id,created_at")
+                @Index(name="ix_comment_post_created", columnList = "post_id,created_at")
         })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Comment {

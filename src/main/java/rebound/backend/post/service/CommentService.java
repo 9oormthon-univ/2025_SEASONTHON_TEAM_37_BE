@@ -1,4 +1,3 @@
-// path: src/main/java/rebound/backend/post/service/CommentService.java
 package rebound.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
@@ -21,11 +20,13 @@ public class CommentService {
 
     private Long me() { return InteractionAuth.currentMemberId(); }
 
+    // 목록
     public Slice<Comment> list(Long postId, int page, int size) {
         return commentRepo.findByPostIdAndStatusOrderByCreatedAtAsc(
                 postId, CommentStatus.PUBLIC, PageRequest.of(page, size));
     }
 
+    // 댓글 생성
     @Transactional
     public Comment create(Long postId, String content, boolean isAnonymous, Long parentId) {
         var c = Comment.builder()
@@ -39,41 +40,62 @@ public class CommentService {
         return commentRepo.save(c);
     }
 
-    /** 자식 있으면 소프트 삭제, 없으면 하드 삭제 */
+    // 조건부 삭제
     @Transactional
     public void delete(Long commentId) {
+        Long m = me();
+        Comment c = commentRepo.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("댓글을 찾을 수 없습니다. id=" + commentId));
+        if (!c.getMemberId().equals(m)) {
+            throw new IllegalArgumentException("내가 작성한 댓글만 삭제할 수 있습니다.");
+        }
+
         boolean hasChildren = commentRepo.existsByParentCommentIdAndStatusNot(
                 commentId, CommentStatus.DELETED);
 
         if (hasChildren) {
-            commentRepo.softDelete(commentId);     // 자리표시 + 상태만 변경
+            commentRepo.softDelete(commentId);
         } else {
-            commentRepo.deleteById(commentId);     // 실제 삭제
+            commentRepo.deleteById(commentId);
         }
     }
 
-    /** 댓글 하트 토글 (빌더 사용, 동시요청 대비) */
+    // 하트토글 및 like_count 동기화
     @Transactional
     public boolean toggleHeart(Long commentId) {
         Long m = me();
-        boolean exists = reactionRepo.existsByCommentIdAndMemberIdAndType(commentId, m, ReactionType.HEART);
-        if (exists) {
+        boolean existed = reactionRepo.existsByCommentIdAndMemberIdAndType(commentId, m, ReactionType.HEART);
+
+        if (existed) {
             reactionRepo.deleteByCommentIdAndMemberIdAndType(commentId, m, ReactionType.HEART);
+            syncLikeCount(commentId);
             return false;
         } else {
             try {
                 reactionRepo.save(
                         CommentReaction.builder()
-                                .commentId(commentId)      // ← 빌더 사용
+                                .commentId(commentId)
                                 .memberId(m)
                                 .type(ReactionType.HEART)
                                 .build()
                 );
+                syncLikeCount(commentId);
                 return true;
             } catch (DataIntegrityViolationException dup) {
-                // 동시 요청으로 이미 생긴 경우 → 켜진 상태로 간주
+                // 거의 동시에 같은 사용자 요청이 들어온 경우 → 이미 만들어졌다고 보고 켜진 상태 반환
+                syncLikeCount(commentId);
                 return true;
             }
         }
+    }
+
+    public long countHearts(Long commentId) {
+        return reactionRepo.countByCommentIdAndType(commentId, ReactionType.HEART);
+    }
+
+    // 현재 reaction 집계값으로 like_count 세팅
+    private void syncLikeCount(Long commentId) {
+        int cnt = (int) reactionRepo.countByCommentIdAndType(commentId, ReactionType.HEART);
+        commentRepo.updateLikeCount(commentId, cnt);
     }
 }

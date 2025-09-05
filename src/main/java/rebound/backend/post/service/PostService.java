@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,9 @@ import rebound.backend.post.dto.PostUpdateRequest;
 import rebound.backend.post.entity.Post;
 import rebound.backend.post.entity.PostContent;
 import rebound.backend.post.entity.PostImage;
+import rebound.backend.post.entity.ReactionType;
+import rebound.backend.post.repository.PostBookmarkRepository;
+import rebound.backend.post.repository.PostReactionRepository;
 import rebound.backend.post.repository.PostRepository;
 import rebound.backend.post.repository.PostSpecification;
 import rebound.backend.s3.service.S3Service;
@@ -27,8 +31,7 @@ import rebound.backend.tag.repository.TagRepository;
 import rebound.backend.utils.NicknameMasker;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +43,10 @@ public class PostService {
     private final TagRepository tagRepository;
     private final S3Service s3Service;
     private final MemberRepository memberRepository;
+
+    //인터랙션 리포지토리 추가
+    private final PostReactionRepository postReactionRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
 
     /**
      * 카테고리별 게시글 목록 조회
@@ -56,8 +63,7 @@ public class PostService {
         }
 
         Page<Post> posts = postRepository.findAll(spec, pageable);
-        return mapToPostResponsePage(posts);
-    }
+        return mapToPostResponsePage(posts);    }
 
 
     /**
@@ -80,7 +86,24 @@ public class PostService {
                 ? NicknameMasker.mask(author.getNickname())
                 : author.getNickname();
 
-        return PostResponse.from(post, finalNickname);
+        PostResponse dto = PostResponse.from(post, finalNickname);
+
+        // 상세에도 좋아요/스크랩 카운트 + 내 상태 추가
+        long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
+        long bookmarkCount = postBookmarkRepository.countByPostId(postId);
+
+        Long me = currentMemberIdOrNull(); // [추가]
+        boolean liked = false, bookmarked = false;
+        if (me != null) {
+            liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
+            bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
+        }
+
+        dto.setLikeCount(likeCount);
+        dto.setBookmarkCount(bookmarkCount);
+        dto.setLiked(liked);
+        dto.setBookmarked(bookmarked);
+        return dto;
     }
 
     /**
@@ -134,7 +157,15 @@ public class PostService {
                 ? NicknameMasker.mask(currentMember.getNickname())
                 : currentMember.getNickname();
 
-        return PostResponse.from(savedPost, finalNickname);
+        PostResponse dto = PostResponse.from(savedPost, finalNickname);
+
+        // 생성 직후 기본값(0/false)으로 채워서 일관된 응답 형태 유지
+        dto.setLikeCount(0L);
+        dto.setBookmarkCount(0L);
+        dto.setLiked(false);
+        dto.setBookmarked(false);
+
+        return dto;
     }
 
 
@@ -189,10 +220,24 @@ public class PostService {
         String finalNickname = post.getIsAnonymous()
                 ? NicknameMasker.mask(author.getNickname())
                 : author.getNickname();
-        return PostResponse.from(post, finalNickname);
+        PostResponse dto = PostResponse.from(post, finalNickname);
+
+        //수정 후 최신 인터랙션 반영
+        long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
+        long bookmarkCount = postBookmarkRepository.countByPostId(postId);
+        Long me = currentMemberIdOrNull();
+        boolean liked = false, bookmarked = false;
+        if (me != null) {
+            liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
+            bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
+        }
+        dto.setLikeCount(likeCount);
+        dto.setBookmarkCount(bookmarkCount);
+        dto.setLiked(liked);
+        dto.setBookmarked(bookmarked);
+
+        return dto;
     }
-
-
     /**
      * 게시글 검색 (키워드 기반, 페이징 포함) - PostResponse DTO 사용
      */
@@ -254,11 +299,36 @@ public class PostService {
         Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
                 .collect(Collectors.toMap(Member::getId, member -> member));
 
+        Long me = currentMemberIdOrNull();
+
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
             String nickname = (author != null) ? author.getNickname() : "알 수 없는 사용자";
             String finalNickname = post.getIsAnonymous() ? NicknameMasker.mask(nickname) : nickname;
-            return PostResponse.from(post, finalNickname);
+            PostResponse dto = PostResponse.from(post, finalNickname);
+
+            // 단건 집계(페이지 크기만큼)
+            long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
+            long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
+
+            boolean liked = false, bookmarked = false;
+            if (me != null) {
+                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), me, ReactionType.HEART);
+                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), me);
+            }
+
+            dto.setLikeCount(likeCount);
+            dto.setBookmarkCount(bookmarkCount);
+            dto.setLiked(liked);
+            dto.setBookmarked(bookmarked);
+            return dto;
         });
     }
+        // 현재 로그인한 memberId (없으면 null) 추가
+        private Long currentMemberIdOrNull() {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) return null;
+            String loginId = auth.getName();
+            return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
+        }
 }
