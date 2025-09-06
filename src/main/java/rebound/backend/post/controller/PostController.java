@@ -94,4 +94,12 @@ public class PostController {
         Page<PostResponse> results = postService.getPopularPosts(pageable);
         return ResponseEntity.ok(results);
     }
+
+    @Operation(summary = "추천 실패담 목록 조회", description = "현재 로그인한 사용자의 관심사에 기반한 게시글 목록을 최신순으로 조회합니다.")
+    @GetMapping("/recommendations")
+    public ResponseEntity<Page<PostResponse>> getRecommendedPosts(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<PostResponse> results = postService.getRecommendedPosts(pageable);
+        return ResponseEntity.ok(results);
+    }
 }
