@@ -43,6 +43,28 @@ public class PostService {
     private final PostBookmarkRepository postBookmarkRepository;
 
     /**
+     * 추천 실패담 목록 조회 (관심사 기반)
+     */
+    public Page<PostResponse> getRecommendedPosts(Pageable pageable) {
+        Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        Member currentMember = memberRepository.findById(currentMemberId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
+        List<MainCategory> interests = currentMember.getInterests().stream()
+                .map(interest -> interest.getMainCategory())
+                .collect(Collectors.toList());
+
+        if (interests.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        Specification<Post> spec = PostSpecification.inMainCategories(interests);
+
+        Page<Post> posts = postRepository.findAll(spec, pageable);
+        return mapToPostResponsePage(posts);
+    }
+
+    /**
      * 카테고리별 게시글 목록 조회
      */
     public Page<PostResponse> getPosts(MainCategory mainCategory, SubCategory subCategory, Pageable pageable) {
