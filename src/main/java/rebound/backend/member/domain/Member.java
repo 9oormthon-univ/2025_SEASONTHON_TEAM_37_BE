@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -35,4 +37,13 @@ public class Member {
 
     @OneToOne(mappedBy = "member", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private MemberImage memberImage;
+
+    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Interest> interests = new ArrayList<>();
+
+    public void addInterest(Interest interest) {
+        this.interests.add(interest);
+        interest.setMember(this);
+    }
 }
