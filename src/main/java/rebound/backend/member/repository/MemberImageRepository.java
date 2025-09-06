@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import rebound.backend.member.domain.MemberImage;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface MemberImageRepository extends JpaRepository<MemberImage, Long> {
@@ -14,4 +16,7 @@ public interface MemberImageRepository extends JpaRepository<MemberImage, Long> 
     WHERE mI.member.id = :memberId
     """)
     Optional<MemberImage> findImageByMemberId(@Param("memberId") Long memberId);
+
+    Collection<Object> findAllByMemberIdIn(Collection<Long> memberIds);
+    List<MemberImage> findAllByMember_IdIn(List<Long> memberIds);
 }

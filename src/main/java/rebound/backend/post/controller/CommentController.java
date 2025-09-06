@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import rebound.backend.post.dto.CommentResponse;
 import rebound.backend.post.entity.Comment;
 import rebound.backend.post.entity.CommentStatus;
 import rebound.backend.post.service.CommentService;
@@ -24,24 +25,16 @@ public class CommentController {
 
     private final CommentService service;
 
-    /** 무한스크롤: items + hasNext + page
-     *  - likeCount는 "읽을 때" 동적 집계해서 내려줌
-     *  - (필요시) liked 여부도 함께 내려주고 싶으면 DTO 필드 추가하면 됨
-     */
     @GetMapping("/posts/{postId}/comments")
     public Map<String, Object> list(@PathVariable @Positive Long postId,
                                     @RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "20") int size) {
-        Slice<Comment> slice = service.list(postId, page, size);
+        // 서비스로부터 모든 정보가 담긴 CommentResponse DTO 슬라이스를 받습니다.
+        Slice<CommentResponse> slice = service.list(postId, page, size);
 
-        List<CommentDto> items = slice.getContent().stream().map(c -> {
-            long likeCnt = service.countHearts(c.getCommentId());
-            // boolean liked = service.likedByMe(c.getCommentId()); // 필요하면 DTO에 필드 추가
-            return CommentDto.from(c, likeCnt);
-        }).toList();
-
+        // 더 이상 컨트롤러에서 추가적인 service 호출(N+1 유발)을 할 필요가 없습니다.
         return Map.of(
-                "items", items,
+                "items", slice.getContent(), // DTO 리스트를 그대로 사용
                 "hasNext", slice.hasNext(),
                 "page", page
         );

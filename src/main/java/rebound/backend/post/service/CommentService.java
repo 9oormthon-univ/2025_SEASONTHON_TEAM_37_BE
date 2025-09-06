@@ -4,12 +4,23 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rebound.backend.member.domain.Member;
+import rebound.backend.member.domain.MemberImage;
+import rebound.backend.member.repository.MemberImageRepository;
+import rebound.backend.member.repository.MemberRepository;
+import rebound.backend.post.dto.CommentResponse;
 import rebound.backend.post.entity.*;
 import rebound.backend.post.repository.CommentReactionRepository;
 import rebound.backend.post.repository.CommentRepository;
 import rebound.backend.utils.InteractionAuth;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,13 +28,55 @@ public class CommentService {
 
     private final CommentRepository commentRepo;
     private final CommentReactionRepository reactionRepo;
+    private final MemberRepository memberRepository;
+    private final MemberImageRepository memberImageRepository;
 
     private Long me() { return InteractionAuth.currentMemberId(); }
 
-    // 목록
-    public Slice<Comment> list(Long postId, int page, int size) {
-        return commentRepo.findByPostIdAndStatusOrderByCreatedAtAsc(
-                postId, CommentStatus.PUBLIC, PageRequest.of(page, size));
+    /**
+     * 댓글 목록 조회 (컴파일 오류 수정된 최종본)
+     */
+    public Slice<CommentResponse> list(Long postId, int page, int size) {
+        // 1. 댓글 목록을 엔티티로 조회 (쿼리 1)
+        PageRequest pageable = PageRequest.of(page, size);
+        Slice<Comment> commentSlice = commentRepo.findByPostIdAndStatusOrderByCreatedAtAsc(
+                postId, CommentStatus.PUBLIC, pageable);
+
+        List<Comment> comments = commentSlice.getContent();
+        if (comments.isEmpty()) {
+            // [오류 1 수정] Slice.empty() 대신 명시적으로 SliceImpl 반환
+            return new SliceImpl<>(Collections.emptyList(), pageable, commentSlice.hasNext());
+        }
+
+        // 2. *모든* 댓글의 작성자 ID를 추출 (익명 포함)
+        List<Long> allMemberIds = comments.stream()
+                .map(Comment::getMemberId)
+                .distinct()
+                .toList();
+
+        // 3. *모든* 작성자들의 Member 정보를 조회 (쿼리 2)
+        // [오류 2 수정] 'findAllByIdIn' -> 'findAllById' (JPA 기본 제공 메서드)
+        Map<Long, Member> memberMap = memberRepository.findAllById(allMemberIds).stream()
+                .collect(Collectors.toMap(Member::getId, m -> m));
+
+        // 4. *모든* 작성자들의 이미지 정보를 조회 (쿼리 3)
+        // [오류 3, 4 수정] 'findAllByMemberIdIn' -> 'findAllByMember_IdIn' (Repo에 새로 추가한 메서드)
+        Map<Long, MemberImage> imageMap = memberImageRepository.findAllByMember_IdIn(allMemberIds).stream()
+                .collect(Collectors.toMap(img -> img.getMember().getId(), img -> img));
+
+        // 5. 엔티티 목록을 DTO로 변환
+        List<CommentResponse> dtoList = comments.stream()
+                .map(comment -> {
+                    Member member = memberMap.get(comment.getMemberId());
+                    MemberImage image = imageMap.get(comment.getMemberId());
+
+                    // DTO 팩토리 메서드가 수정된 로직으로 최종 DTO를 생성
+                    return CommentResponse.from(comment, member, image);
+                })
+                .toList();
+
+        // 6. 최종 Slice로 반환 (이것이 Slice<CommentResponse> 타입)
+        return new SliceImpl<>(dtoList, commentSlice.getPageable(), commentSlice.hasNext());
     }
 
     // 댓글 생성
