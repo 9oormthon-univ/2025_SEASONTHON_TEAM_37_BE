@@ -30,6 +30,6 @@ public interface PostBookmarkRepository extends JpaRepository<PostBookmark, Long
     @Transactional
     long deleteByPostIdAndMemberId(Long postId, Long memberId);
 
-    @Query("SELECT pb.postId FROM PostBookmark pb WHERE pb.memberId = :memberId ORDER BY pb.bookmarkedAt DESC")
+    @Query("SELECT pb.postId FROM PostBookmark pb WHERE pb.memberId = :memberId ORDER BY pb.createdAt DESC")
     Slice<Long> findBookmarkedPostIdsBy(@Param("memberId") Long memberId, Pageable pageable);
 }
