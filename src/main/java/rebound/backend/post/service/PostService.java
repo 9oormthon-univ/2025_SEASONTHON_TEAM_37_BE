@@ -96,6 +96,7 @@ public class PostService {
     /**
      * 게시글 상세 조회
      */
+    @Transactional(readOnly = true)
     public PostResponse getPostDetails(Long postId) {
         Post post = findPostById(postId);
         Member author = memberRepository.findById(post.getMemberId())
@@ -104,6 +105,10 @@ public class PostService {
         long likeCount = postReactionRepository.countByPostIdAndType(postId, ReactionType.HEART);
         long bookmarkCount = postBookmarkRepository.countByPostId(postId);
 
+        // 작성자의 총 좋아요수 조회
+        long totalLikes = postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+        boolean hasRankBadge = (totalLikes >= 10); // 10개 이상일 경우 true
+
         Long me = currentMemberIdOrNull();
         boolean liked = false, bookmarked = false;
         if (me != null) {
@@ -111,7 +116,7 @@ public class PostService {
             bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
         }
 
-        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
+        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
     }
 
     /**
@@ -158,7 +163,7 @@ public class PostService {
         }
         Post savedPost = postRepository.save(post);
 
-        return PostResponse.from(savedPost, currentMember, 0L, 0L, false, false);
+        return PostResponse.from(savedPost, currentMember, 0L, 0L, false, false, false);
     }
 
     /**
@@ -222,7 +227,10 @@ public class PostService {
             liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
             bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
         }
-        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
+    long totalLikes =
+            postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+        boolean hasRankBadge = (totalLikes >= 10);
+        return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
     }
 
     /**
@@ -275,10 +283,22 @@ public class PostService {
         Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
                 .collect(Collectors.toMap(Member::getId, member -> member));
 
+        // 작성자별 총 좋아요수 미리 조회
+        List<Object[]> totalLikesList = postReactionRepository.countTotalLikesByMemberIds(authorIds, ReactionType.HEART);
+        Map<Long, Long> totalLikesMap = totalLikesList.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0], // memberId
+                        row -> (Long) row[1]  // totalLikes
+                ));
+
         Long me = currentMemberIdOrNull();
 
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
+
+            // 작성자별 총 좋아요수를 map에서 가져옴
+            long totalLikes = totalLikesMap.getOrDefault(author.getId(), 0L);
+            boolean hasRankBadge = (totalLikes >= 10);
 
             long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
             long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
@@ -289,7 +309,7 @@ public class PostService {
                 bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), me);
             }
 
-            return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked);
+            return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
         });
     }
 
@@ -300,3 +320,4 @@ public class PostService {
         return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
     }
 }
+//하은랭킹뱃지 커밋확인

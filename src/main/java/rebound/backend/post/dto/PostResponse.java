@@ -41,6 +41,7 @@ public class PostResponse {
         private final Long memberId;
         private final String nickname;
         private final String profileImage;
+        private final boolean hasRankBadge;
     }
 
     @Getter
@@ -61,7 +62,7 @@ public class PostResponse {
         }
     }
 
-    public static PostResponse from(Post post, Member author, long likeCount, long bookmarkCount, boolean liked, boolean bookmarked) {
+    public static PostResponse from(Post post, Member author, long likeCount, long bookmarkCount, boolean liked, boolean bookmarked, boolean hasRankBadge) {
         AuthorDetail authorDetail;
         if (author != null) {
             if (post.getIsAnonymous()) {

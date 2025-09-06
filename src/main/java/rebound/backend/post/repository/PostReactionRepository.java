@@ -18,6 +18,9 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, Long
 
     long countByPostIdAndType(Long postId, ReactionType type);
 
+    // 특정 사용자가 받은 총 좋아요 수를 조회하는 메서드 (새로 추가)
+    long countByMemberIdAndType(Long memberId, ReactionType type);
+
     // 마이페이지: 내가 하트 누른 글 postId 목록
     @Query("""
            select r.postId
@@ -53,4 +56,8 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, Long
         Long getPostId();
         Long getCnt();
     }
+
+    // 주어진 사용자 목록이 받은 총 좋아요 수를 한 번에 조회하는 메서드
+    @Query("SELECT pr.memberId, COUNT(pr) FROM PostReaction pr WHERE pr.memberId IN :memberIds AND pr.type = :type GROUP BY pr.memberId")
+    List<Object[]> countTotalLikesByMemberIds(@Param("memberIds") List<Long> memberIds, @Param("type") ReactionType type);
 }
