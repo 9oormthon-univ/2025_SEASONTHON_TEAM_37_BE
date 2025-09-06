@@ -1,35 +1,46 @@
 package rebound.backend.post.repository;
 
-import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import rebound.backend.post.entity.PostBookmark;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Collection;
 
 public interface PostBookmarkRepository extends JpaRepository<PostBookmark, Long> {
 
     boolean existsByPostIdAndMemberId(Long postId, Long memberId);
 
-    long countByPostId(Long postId);
-
-    // N+1 쿼리 해결: 여러 게시글의 북마크 수를 한 번에 조회하는 메서드
-    @Query("SELECT pb.postId, COUNT(pb) FROM PostBookmark pb WHERE pb.postId IN :postIds GROUP BY pb.postId")
-    Map<Long, Long> countByPostIds(@Param("postIds") List<Long> postIds);
-
-    // N+1 쿼리 해결: 현재 사용자가 북마크한 게시글 ID를 한 번에 조회하는 메서드
-    @Query("SELECT pb.postId FROM PostBookmark pb WHERE pb.memberId = :memberId AND pb.postId IN :postIds")
-    Set<Long> findBookmarkedPostIdsByMemberIdAndPostIds(@Param("memberId") Long memberId, @Param("postIds") List<Long> postIds);
-
-    // 추가해야 할 메서드 2: 특정 게시글에 대한 특정 사용자의 북마크 삭제
-    @Transactional
     long deleteByPostIdAndMemberId(Long postId, Long memberId);
 
-    @Query("SELECT pb.postId FROM PostBookmark pb WHERE pb.memberId = :memberId ORDER BY pb.createdAt DESC")
-    Slice<Long> findBookmarkedPostIdsBy(@Param("memberId") Long memberId, Pageable pageable);
+    long countByPostId(Long postId); // 최신 집계 반환 (목록/버튼 옆 숫자 표시용)
+
+    //마이페이지: 내가 스크랩한 게시글 ID목록(최신순)
+    @Query("""
+           select b.postId
+           from PostBookmark b
+           where b.memberId = :memberId
+           order by b.createdAt desc
+           """)
+    Slice<Long> findBookmarkedPostIdsBy(Long memberId, org.springframework.data.domain.Pageable pageable);
+    // 마이페이지: 내가 북마크한 글 postId 목록 (최신순)
+    @Query("""
+           select b.postId
+           from PostBookmark b
+           where b.memberId = :memberId
+           order by b.createdAt desc
+           """)
+    List<Long> findPostIdsBookmarkedBy(@Param("memberId") Long memberId);
+
+    // 특정 여러 게시글(postIds)에 대해서 북마크 여부 확인
+    @Query("""
+           select b.postId
+           from PostBookmark b
+           where b.memberId = :memberId and b.postId in :postIds
+           """)
+    List<Long> findBookmarkedPostIds(@Param("memberId") Long memberId,
+                                     @Param("postIds") Collection<Long> postIds);
 }

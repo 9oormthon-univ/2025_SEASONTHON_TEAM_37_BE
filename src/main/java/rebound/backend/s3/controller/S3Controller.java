@@ -16,7 +16,7 @@ public class S3Controller {
     private final S3Service s3Service;
 
     @Operation(summary = "(테스트)사진 S3에 저장하고 url 반환")
-    @PostMapping(value = "/api/v1/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) throws IOException {
         String url = s3Service.uploadFile(file);
         return ResponseEntity.ok(url);

@@ -9,8 +9,6 @@ import rebound.backend.post.entity.PostReaction;
 import rebound.backend.post.entity.ReactionType;
 
 import java.util.List;
-import java.util.Set;
-import java.util.Map;
 
 public interface PostReactionRepository extends JpaRepository<PostReaction, Long> {
 
@@ -54,16 +52,10 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, Long
                                   @Param("memberId") Long memberId,
                                   @Param("postIds") List<Long> postIds);
 
-    @Query("SELECT pr.postId FROM PostReaction pr WHERE pr.memberId = :memberId AND pr.postId IN :postIds AND pr.type = :type")
-    Set<Long> findLikedPostIdsByMemberIdAndPostIds(@Param("memberId") Long memberId, @Param("postIds") List<Long> postIds, @Param("type") ReactionType type);
-
     interface PostCountRow {
         Long getPostId();
         Long getCnt();
     }
-
-    @Query("SELECT pr.postId, COUNT(pr) FROM PostReaction pr WHERE pr.postId IN :postIds AND pr.type = :type GROUP BY pr.postId")
-    Map<Long, Long> countByPostIds(@Param("postIds") List<Long> postIds, @Param("type") ReactionType type);
 
     // 주어진 사용자 목록이 받은 총 좋아요 수를 한 번에 조회하는 메서드
     @Query("SELECT pr.memberId, COUNT(pr) FROM PostReaction pr WHERE pr.memberId IN :memberIds AND pr.type = :type GROUP BY pr.memberId")
