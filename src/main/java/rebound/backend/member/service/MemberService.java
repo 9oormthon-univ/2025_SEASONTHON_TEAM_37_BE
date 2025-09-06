@@ -55,6 +55,7 @@ public class MemberService {
                 .age(joinRequest.getAge())
                 .field(joinRequest.getField())
                 .createdAt(LocalDateTime.now())
+                .provider("LOCAL_LOGIN")
                 .build();
 
         List<MainCategory> interests = joinRequest.getInterests();

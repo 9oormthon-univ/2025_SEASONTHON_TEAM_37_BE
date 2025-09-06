@@ -11,6 +11,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import rebound.backend.member.google.CustomOAuth2UserService;
+import rebound.backend.member.google.OAuth2LoginSuccessHandler;
 import rebound.backend.member.util.JwtAuthenticationFilter;
 
 @Configuration
@@ -19,6 +21,8 @@ import rebound.backend.member.util.JwtAuthenticationFilter;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler; // 핸들러 주입
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -39,6 +43,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/mypage/**").authenticated()
 
                         .anyRequest().permitAll()
+                )
+
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2LoginSuccessHandler)
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
                 )
 
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
