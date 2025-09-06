@@ -29,6 +29,7 @@ public class PostResponse {
     private final String learningContent;
     private final String nextStepContent;
     private final AuthorDetail author;
+    private final Post.Status status;
 
     private final Long likeCount;
     private final Long bookmarkCount;
@@ -115,6 +116,7 @@ public class PostResponse {
                 .bookmarkCount(bookmarkCount)
                 .liked(liked)
                 .bookmarked(bookmarked)
+                .status(post.getStatus())
                 .build();
     }
 }
