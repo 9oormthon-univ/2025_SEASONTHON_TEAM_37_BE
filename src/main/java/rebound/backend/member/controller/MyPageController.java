@@ -20,7 +20,7 @@ public class MyPageController {
 
     private final MemberService memberService;
 
-    @Operation(summary = "마이페이지 정보", description = "회원의 닉네임, 나이, 직군, 프로필 이미지를 반환합니다. 헤더에 토큰 필요")
+    @Operation(summary = "마이페이지 정보", description = "회원의 닉네임, 나이, 직군, 프로필 이미지, 관심 카테고리를 반환합니다. 헤더에 토큰 필요")
     @GetMapping
     public ResponseEntity<MyInfoResponse> myPage() {
         Long memberId = InteractionAuth.currentMemberId();

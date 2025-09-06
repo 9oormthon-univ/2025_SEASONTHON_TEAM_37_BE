@@ -106,7 +106,7 @@ public class MemberService {
             imageUrl = ""; //없으면 빈 문자열
         }
 
-        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl);
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, member.getInterests());
     }
 
     public void memberInfoModify(MemberModifyRequest request, MultipartFile modifyImage, Long memberId) throws IOException {
@@ -121,6 +121,7 @@ public class MemberService {
                 .loginId(member.getLoginId())
                 .password_hash(member.getPassword_hash())
                 .createdAt(member.getCreatedAt())
+                .interests(request.getInterests())
                 .build();
 
         //프로필 이미지가 들어온 경우,
