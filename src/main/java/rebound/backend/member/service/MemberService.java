@@ -135,43 +135,45 @@ public class MemberService {
     }
 
     public void memberInfoModify(MemberModifyRequest request, Long memberId) {
+        // 1. DB에서 영속성 컨텍스트가 관리하는 'member' 엔티티를 조회합니다.
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
+        // 2. 조회한 'member' 객체의 필드를 직접 변경합니다. (더티 체킹)
+        member.setNickname(request.getNickname());
+        member.setAge(request.getAge());
+        member.setField(request.getField());
+
+        // 3. 관심사(Interests) 수정: 기존 컬렉션을 비우고 새로 추가합니다.
+        // (CascadeType.ALL, orphanRemoval=true 설정이 Member 엔티티의 interests 필드에 있어야 완벽하게 동작합니다)
+        member.getInterests().clear(); // 기존 관심사 삭제
         List<MainCategory> categories = request.getInterests();
-        List<Interest> interests = new LinkedList<>();
-        for (MainCategory category : categories) {
-            Interest interest = Interest.builder()
-                    .member(member)
-                    .mainCategory(category)
-                    .build();
-            interests.add(interest);
+        if (categories != null) {
+            for (MainCategory category : categories) {
+                Interest interest = Interest.builder()
+                        .member(member) // 반드시 영속 상태인 member 객체를 참조해야 합니다.
+                        .mainCategory(category)
+                        .build();
+                member.getInterests().add(interest); // 관리되는 컬렉션에 추가
+            }
         }
 
-        Member editMember = Member.builder()
-                .id(member.getId())
-                .nickname(request.getNickname())
-                .age(request.getAge())
-                .field(request.getField())
-                .loginId(member.getLoginId())
-                .password_hash(member.getPassword_hash())
-                .createdAt(member.getCreatedAt())
-                .interests(interests)
-                .build();
+        // 4. 프로필 이미지 수정 (이전 오류의 핵심 원인)
+        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+            MemberImage existingImage = member.getMemberImage(); // 회원의 기존 이미지 조회
 
-        if (request.getImageUrl() != null) {
-            if (member.getMemberImage() != null) {
-                MemberImage originImage = memberImageRepository.findImageByMemberId(member.getId()).get();
-                memberImageRepository.delete(originImage);
-            }
-                MemberImage memberImage = MemberImage.builder()
-                        .member(editMember)
+            if (existingImage != null) {
+                // 4-1. 이미지가 이미 존재하면: URL만 업데이트합니다. (UPDATE 쿼리 발생)
+                existingImage.setImageUrl(request.getImageUrl());
+            } else {
+                // 4-2. 이미지가 없으면: 새로 생성하고 관계를 설정합니다. (INSERT 쿼리 발생)
+                MemberImage newImage = MemberImage.builder()
+                        .member(member) // 영속 상태인 member 객체와 연결
                         .imageUrl(request.getImageUrl())
                         .build();
-
-                memberImageRepository.save(memberImage);
+                memberImageRepository.save(newImage); // 새 이미지는 저장(persist)
+                member.setMemberImage(newImage); // member 객체에도 관계 설정
+            }
         }
-
-        memberRepository.save(editMember);
     }
-}
+    }
