@@ -27,8 +27,7 @@ import rebound.backend.post.repository.PostSpecification;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -227,8 +226,8 @@ public class PostService {
             liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
             bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
         }
-    long totalLikes =
-            postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+        long totalLikes =
+                postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
         boolean hasRankBadge = (totalLikes >= 10);
         return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
     }
@@ -274,7 +273,22 @@ public class PostService {
                 .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
     }
 
+    /**
+     * 게시글 목록을 DTO 페이지로 변환하고 좋아요/북마크 여부 확인
+     * N+1 쿼리 문제 해결
+     */
     private Page<PostResponse> mapToPostResponsePage(Page<Post> posts) {
+        if (posts.isEmpty()) return Page.empty();
+
+        List<Long> postIds = posts.getContent().stream()
+                .map(Post::getPostId)
+                .collect(Collectors.toList());
+
+        // 1. 좋아요 및 북마크 수 미리 조회 (쿼리 2번)
+        Map<Long, Long> likeCounts = postReactionRepository.countByPostIds(postIds, ReactionType.HEART);
+        Map<Long, Long> bookmarkCounts = postBookmarkRepository.countByPostIds(postIds);
+
+        // 2. 작성자 및 랭크 배지 정보 미리 조회
         List<Long> authorIds = posts.getContent().stream()
                 .map(Post::getMemberId)
                 .distinct()
@@ -283,7 +297,6 @@ public class PostService {
         Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
                 .collect(Collectors.toMap(Member::getId, member -> member));
 
-        // 작성자별 총 좋아요수 미리 조회
         List<Object[]> totalLikesList = postReactionRepository.countTotalLikesByMemberIds(authorIds, ReactionType.HEART);
         Map<Long, Long> totalLikesMap = totalLikesList.stream()
                 .collect(Collectors.toMap(
@@ -291,23 +304,28 @@ public class PostService {
                         row -> (Long) row[1]  // totalLikes
                 ));
 
+        // 3. 현재 사용자의 좋아요 및 북마크 여부 미리 조회 (N+1 쿼리 해결)
         Long me = currentMemberIdOrNull();
 
+        // ⭐️ 삼항 연산자를 사용하여 변수를 선언과 동시에 초기화
+        Set<Long> likedPostIds = (me != null) ?
+                postReactionRepository.findLikedPostIdsByMemberIdAndPostIds(me, postIds, ReactionType.HEART) :
+                Collections.emptySet();
+
+        Set<Long> bookmarkedPostIds = (me != null) ?
+                postBookmarkRepository.findBookmarkedPostIdsByMemberIdAndPostIds(me, postIds) :
+                Collections.emptySet();
+
+        // 4. DTO로 변환
         return posts.map(post -> {
             Member author = authors.get(post.getMemberId());
-
-            // 작성자별 총 좋아요수를 map에서 가져옴
             long totalLikes = totalLikesMap.getOrDefault(author.getId(), 0L);
             boolean hasRankBadge = (totalLikes >= 10);
 
-            long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
-            long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
-
-            boolean liked = false, bookmarked = false;
-            if (me != null) {
-                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), me, ReactionType.HEART);
-                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), me);
-            }
+            boolean liked = likedPostIds.contains(post.getPostId());
+            boolean bookmarked = bookmarkedPostIds.contains(post.getPostId());
+            long likeCount = likeCounts.getOrDefault(post.getPostId(), 0L);
+            long bookmarkCount = bookmarkCounts.getOrDefault(post.getPostId(), 0L);
 
             return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
         });
@@ -320,4 +338,3 @@ public class PostService {
         return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
     }
 }
-//하은랭킹뱃지 커밋확인
