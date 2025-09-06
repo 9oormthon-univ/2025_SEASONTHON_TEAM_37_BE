@@ -1,6 +1,5 @@
 package rebound.backend.member.service;
 
-import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.category.entity.MainCategory;
 import rebound.backend.member.domain.Interest;
 import rebound.backend.member.domain.Member;
@@ -20,8 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import rebound.backend.s3.service.S3Service;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.LinkedList;
 import java.util.List;
 
 @Service
@@ -106,12 +105,28 @@ public class MemberService {
             imageUrl = ""; //없으면 빈 문자열
         }
 
-        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl);
+        List<MainCategory> categories = new LinkedList<>();
+        List<Interest> interests = member.getInterests();
+        for (Interest interest : interests) {
+            categories.add(interest.getMainCategory());
+        }
+
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, categories);
     }
 
-    public void memberInfoModify(MemberModifyRequest request, MultipartFile modifyImage, Long memberId) throws IOException {
+    public void memberInfoModify(MemberModifyRequest request, Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
+
+        List<MainCategory> categories = request.getInterests();
+        List<Interest> interests = new LinkedList<>();
+        for (MainCategory category : categories) {
+            Interest interest = Interest.builder()
+                    .member(member)
+                    .mainCategory(category)
+                    .build();
+            interests.add(interest);
+        }
 
         Member editMember = Member.builder()
                 .id(member.getId())
@@ -121,34 +136,20 @@ public class MemberService {
                 .loginId(member.getLoginId())
                 .password_hash(member.getPassword_hash())
                 .createdAt(member.getCreatedAt())
+                .interests(interests)
                 .build();
 
-        //프로필 이미지가 들어온 경우,
-        if (modifyImage != null) {
-            if (memberImageRepository.findImageByMemberId(member.getId()).isPresent()) { //기존 이미지가 존재하면,
+        if (request.getImageUrl() != null) {
+            if (member.getMemberImage() != null) {
                 MemberImage originImage = memberImageRepository.findImageByMemberId(member.getId()).get();
-                memberImageRepository.delete(originImage); //기존 이미지 엔티티 삭제
-
-                String editImageUrl = s3Service.uploadFile(modifyImage);
-
-                MemberImage editImage = MemberImage.builder()
-                        .imageUrl(editImageUrl)
-                        .member(member)
+                memberImageRepository.delete(originImage);
+            }
+                MemberImage memberImage = MemberImage.builder()
+                        .member(editMember)
+                        .imageUrl(request.getImageUrl())
                         .build();
 
-                memberImageRepository.save(editImage); //프로필 이미지 추가
-            }
-
-            if (memberImageRepository.findImageByMemberId(member.getId()).isEmpty()) { //기존 이미지 없으면,
-                String newImageUrl = s3Service.uploadFile(modifyImage);
-
-                MemberImage newImage = MemberImage.builder()
-                        .imageUrl(newImageUrl)
-                        .member(member)
-                        .build();
-
-                memberImageRepository.save(newImage); //기존 이미지 제거 없이 추가
-            }
+                memberImageRepository.save(memberImage);
         }
 
         memberRepository.save(editMember);

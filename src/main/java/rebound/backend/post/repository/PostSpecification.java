@@ -7,6 +7,8 @@ import rebound.backend.category.entity.MainCategory;
 import rebound.backend.category.entity.SubCategory;
 import rebound.backend.post.entity.Post;
 
+import java.util.List;
+
 public class PostSpecification {
 
     public static Specification<Post> searchByKeyword(String keyword) {
@@ -57,5 +59,20 @@ public class PostSpecification {
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.equal(root.get("memberId"), memberId);
     }
+
+    public static Specification<Post> inMainCategories(List<MainCategory> mainCategories) {
+        return (root, query, criteriaBuilder) -> {
+            if (mainCategories == null || mainCategories.isEmpty()) {
+                return null;
+            }
+            return root.get("mainCategory").in(mainCategories);
+        };
+    }
+
+    public static Specification<Post> isPublic() {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("status"), Post.Status.PUBLIC);
+    }
+
 }
 

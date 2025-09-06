@@ -27,8 +27,7 @@ import rebound.backend.post.repository.PostSpecification;
 import rebound.backend.tag.entity.Tag;
 import rebound.backend.tag.repository.TagRepository;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +42,29 @@ public class PostService {
     private final PostBookmarkRepository postBookmarkRepository;
 
     /**
+     * 추천 실패담 목록 조회 (관심사 기반)
+     */
+    public Page<PostResponse> getRecommendedPosts(Pageable pageable) {
+        Long currentMemberId = Long.valueOf(SecurityContextHolder.getContext().getAuthentication().getName());
+        Member currentMember = memberRepository.findById(currentMemberId)
+                .orElseThrow(() -> new IllegalArgumentException("현재 로그인된 사용자 정보를 찾을 수 없습니다."));
+
+        List<MainCategory> interests = currentMember.getInterests().stream()
+                .map(interest -> interest.getMainCategory())
+                .collect(Collectors.toList());
+
+        if (interests.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        Specification<Post> spec = PostSpecification.isPublic();
+        spec = spec.and(PostSpecification.inMainCategories(interests));
+
+        Page<Post> posts = postRepository.findAll(spec, pageable);
+        return mapToPostResponsePage(posts);
+    }
+
+    /**
      * 카테고리별 게시글 목록 조회
      */
     public Page<PostResponse> getPosts(MainCategory mainCategory, SubCategory subCategory, Pageable pageable) {
@@ -50,7 +72,8 @@ public class PostService {
             return Page.empty(pageable);
         }
 
-        Specification<Post> spec = PostSpecification.hasSubCategory(subCategory);
+        Specification<Post> spec = PostSpecification.isPublic();
+        spec = spec.and(PostSpecification.hasSubCategory(subCategory));
 
         if (mainCategory != null) {
             spec = spec.and(PostSpecification.hasMainCategory(mainCategory));
@@ -64,7 +87,8 @@ public class PostService {
      * 최신 게시글 목록 조회
      */
     public Page<PostResponse> getRecentPosts(Pageable pageable) {
-        Page<Post> posts = postRepository.findAll(pageable);
+        Specification<Post> spec = PostSpecification.isPublic();
+        Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
     }
 
@@ -202,8 +226,8 @@ public class PostService {
             liked = postReactionRepository.existsByPostIdAndMemberIdAndType(postId, me, ReactionType.HEART);
             bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(postId, me);
         }
-    long totalLikes =
-            postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+        long totalLikes =
+                postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
         boolean hasRankBadge = (totalLikes >= 10);
         return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
     }
@@ -212,7 +236,12 @@ public class PostService {
      * 게시글 검색 (키워드 기반, 페이징 포함)
      */
     public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
-        Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
+        Specification<Post> spec = PostSpecification.isPublic();
+
+        if (keyword != null && !keyword.isBlank()) {
+            spec = spec.and(PostSpecification.searchByKeyword(keyword));
+        }
+
         Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
     }
@@ -244,39 +273,37 @@ public class PostService {
                 .orElseThrow(() -> new IllegalArgumentException("ID에 해당하는 게시글을 찾을 수 없습니다: " + postId));
     }
 
+    /**
+     * 게시글 목록을 DTO 페이지로 변환하고 좋아요/북마크 여부 확인
+     * N+1 쿼리 문제 해결
+     */
     private Page<PostResponse> mapToPostResponsePage(Page<Post> posts) {
-        List<Long> authorIds = posts.getContent().stream()
-                .map(Post::getMemberId)
-                .distinct()
-                .collect(Collectors.toList());
+        if (posts.isEmpty()) return Page.empty();
 
-        Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(Member::getId, member -> member));
-
-        // 작성자별 총 좋아요수 미리 조회
-        List<Object[]> totalLikesList = postReactionRepository.countTotalLikesByMemberIds(authorIds, ReactionType.HEART);
-        Map<Long, Long> totalLikesMap = totalLikesList.stream()
-                .collect(Collectors.toMap(
-                        row -> (Long) row[0], // memberId
-                        row -> (Long) row[1]  // totalLikes
-                ));
-
-        Long me = currentMemberIdOrNull();
+        // 현재 로그인한 사용자 ID 가져오기
+        Long currentMemberId = currentMemberIdOrNull();
 
         return posts.map(post -> {
-            Member author = authors.get(post.getMemberId());
-
-            // 작성자별 총 좋아요수를 map에서 가져옴
-            long totalLikes = totalLikesMap.getOrDefault(author.getId(), 0L);
-            boolean hasRankBadge = (totalLikes >= 10);
-
+            Member author = memberRepository.findById(post.getMemberId()).orElse(null);
+            
+            // 좋아요/북마크 수 조회
             long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
             long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
-
-            boolean liked = false, bookmarked = false;
-            if (me != null) {
-                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), me, ReactionType.HEART);
-                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), me);
+            
+            // 현재 사용자의 좋아요/북마크 여부 확인
+            boolean liked = false;
+            boolean bookmarked = false;
+            if (currentMemberId != null) {
+                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), currentMemberId, ReactionType.HEART);
+                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), currentMemberId);
+            }
+            
+            // 작성자의 총 좋아요 수로 랭크 배지 확인
+            long totalLikes = 0L;
+            boolean hasRankBadge = false;
+            if (author != null) {
+                totalLikes = postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+                hasRankBadge = (totalLikes >= 10);
             }
 
             return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
@@ -286,7 +313,11 @@ public class PostService {
     private Long currentMemberIdOrNull() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) return null;
-        String loginId = auth.getName();
-        return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
+        String memberIdStr = auth.getName();
+        try {
+            return Long.valueOf(memberIdStr);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
