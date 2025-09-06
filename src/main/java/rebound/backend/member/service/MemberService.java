@@ -22,6 +22,7 @@ import rebound.backend.s3.service.S3Service;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.LinkedList;
 import java.util.List;
 
 @Service
@@ -106,12 +107,28 @@ public class MemberService {
             imageUrl = ""; //없으면 빈 문자열
         }
 
-        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, member.getInterests());
+        List<MainCategory> categories = new LinkedList<>();
+        List<Interest> interests = member.getInterests();
+        for (Interest interest : interests) {
+            categories.add(interest.getMainCategory());
+        }
+
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, categories);
     }
 
     public void memberInfoModify(MemberModifyRequest request, MultipartFile modifyImage, Long memberId) throws IOException {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
+
+        List<MainCategory> categories = request.getInterests();
+        List<Interest> interests = new LinkedList<>();
+        for (MainCategory category : categories) {
+            Interest interest = Interest.builder()
+                    .member(member)
+                    .mainCategory(category)
+                    .build();
+            interests.add(interest);
+        }
 
         Member editMember = Member.builder()
                 .id(member.getId())
@@ -121,7 +138,7 @@ public class MemberService {
                 .loginId(member.getLoginId())
                 .password_hash(member.getPassword_hash())
                 .createdAt(member.getCreatedAt())
-                .interests(request.getInterests())
+                .interests(interests)
                 .build();
 
         //프로필 이미지가 들어온 경우,

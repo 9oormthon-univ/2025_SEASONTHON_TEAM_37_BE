@@ -28,7 +28,7 @@ public class MyPageController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "마이페이지 정보 수정", description = "회원 닉네임, 나이, 직군, 프로필 이미지를 수정합니다. 헤더에 토큰 필요")
+    @Operation(summary = "마이페이지 정보 수정", description = "회원 닉네임, 나이, 직군, 프로필 이미지, 관심사를 수정합니다. 헤더에 토큰 필요")
     @PatchMapping
     public ResponseEntity<Void> modifyMyInfo(
             @Valid @RequestPart(value = "request", required = true) MemberModifyRequest request,
