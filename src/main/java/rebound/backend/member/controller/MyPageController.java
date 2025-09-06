@@ -5,7 +5,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import rebound.backend.member.dtos.requests.MemberModifyRequest;
 import rebound.backend.member.dtos.responses.MyInfoResponse;
 import rebound.backend.member.service.MemberService;
@@ -30,12 +29,10 @@ public class MyPageController {
 
     @Operation(summary = "마이페이지 정보 수정", description = "회원 닉네임, 나이, 직군, 프로필 이미지, 관심사를 수정합니다. 헤더에 토큰 필요")
     @PatchMapping
-    public ResponseEntity<Void> modifyMyInfo(
-            @Valid @RequestPart(value = "request", required = true) MemberModifyRequest request,
-            @RequestPart(value = "imageFile", required = false) MultipartFile imageFile) {
+    public ResponseEntity<Void> modifyMyInfo(@Valid @RequestBody MemberModifyRequest request) {
         Long memberId = InteractionAuth.currentMemberId();
         try {
-            memberService.memberInfoModify(request, imageFile, memberId);
+            memberService.memberInfoModify(request, memberId);
         } catch (IOException e) {
             throw new IllegalArgumentException("이미지 파일 오류");
         }

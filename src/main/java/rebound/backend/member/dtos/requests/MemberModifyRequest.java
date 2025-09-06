@@ -15,6 +15,7 @@ public class MemberModifyRequest {
     private int age;
     @NotEmpty
     private String field;
+    private String imageUrl;
 
     private List<MainCategory> interests;
 }
