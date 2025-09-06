@@ -280,52 +280,31 @@ public class PostService {
     private Page<PostResponse> mapToPostResponsePage(Page<Post> posts) {
         if (posts.isEmpty()) return Page.empty();
 
-        List<Long> postIds = posts.getContent().stream()
-                .map(Post::getPostId)
-                .collect(Collectors.toList());
+        // 현재 로그인한 사용자 ID 가져오기
+        Long currentMemberId = currentMemberIdOrNull();
 
-        // 1. 좋아요 및 북마크 수 미리 조회 (쿼리 2번)
-        Map<Long, Long> likeCounts = postReactionRepository.countByPostIds(postIds, ReactionType.HEART);
-        Map<Long, Long> bookmarkCounts = postBookmarkRepository.countByPostIds(postIds);
-
-        // 2. 작성자 및 랭크 배지 정보 미리 조회
-        List<Long> authorIds = posts.getContent().stream()
-                .map(Post::getMemberId)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<Long, Member> authors = memberRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(Member::getId, member -> member));
-
-        List<Object[]> totalLikesList = postReactionRepository.countTotalLikesByMemberIds(authorIds, ReactionType.HEART);
-        Map<Long, Long> totalLikesMap = totalLikesList.stream()
-                .collect(Collectors.toMap(
-                        row -> (Long) row[0], // memberId
-                        row -> (Long) row[1]  // totalLikes
-                ));
-
-        // 3. 현재 사용자의 좋아요 및 북마크 여부 미리 조회 (N+1 쿼리 해결)
-        Long me = currentMemberIdOrNull();
-
-        // ⭐️ 삼항 연산자를 사용하여 변수를 선언과 동시에 초기화
-        Set<Long> likedPostIds = (me != null) ?
-                postReactionRepository.findLikedPostIdsByMemberIdAndPostIds(me, postIds, ReactionType.HEART) :
-                Collections.emptySet();
-
-        Set<Long> bookmarkedPostIds = (me != null) ?
-                postBookmarkRepository.findBookmarkedPostIdsByMemberIdAndPostIds(me, postIds) :
-                Collections.emptySet();
-
-        // 4. DTO로 변환
         return posts.map(post -> {
-            Member author = authors.get(post.getMemberId());
-            long totalLikes = totalLikesMap.getOrDefault(author.getId(), 0L);
-            boolean hasRankBadge = (totalLikes >= 10);
-
-            boolean liked = likedPostIds.contains(post.getPostId());
-            boolean bookmarked = bookmarkedPostIds.contains(post.getPostId());
-            long likeCount = likeCounts.getOrDefault(post.getPostId(), 0L);
-            long bookmarkCount = bookmarkCounts.getOrDefault(post.getPostId(), 0L);
+            Member author = memberRepository.findById(post.getMemberId()).orElse(null);
+            
+            // 좋아요/북마크 수 조회
+            long likeCount = postReactionRepository.countByPostIdAndType(post.getPostId(), ReactionType.HEART);
+            long bookmarkCount = postBookmarkRepository.countByPostId(post.getPostId());
+            
+            // 현재 사용자의 좋아요/북마크 여부 확인
+            boolean liked = false;
+            boolean bookmarked = false;
+            if (currentMemberId != null) {
+                liked = postReactionRepository.existsByPostIdAndMemberIdAndType(post.getPostId(), currentMemberId, ReactionType.HEART);
+                bookmarked = postBookmarkRepository.existsByPostIdAndMemberId(post.getPostId(), currentMemberId);
+            }
+            
+            // 작성자의 총 좋아요 수로 랭크 배지 확인
+            long totalLikes = 0L;
+            boolean hasRankBadge = false;
+            if (author != null) {
+                totalLikes = postReactionRepository.countByMemberIdAndType(author.getId(), ReactionType.HEART);
+                hasRankBadge = (totalLikes >= 10);
+            }
 
             return PostResponse.from(post, author, likeCount, bookmarkCount, liked, bookmarked, hasRankBadge);
         });
@@ -334,7 +313,11 @@ public class PostService {
     private Long currentMemberIdOrNull() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) return null;
-        String loginId = auth.getName();
-        return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
+        String memberIdStr = auth.getName();
+        try {
+            return Long.valueOf(memberIdStr);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
