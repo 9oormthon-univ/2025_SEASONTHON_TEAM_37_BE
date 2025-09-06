@@ -68,5 +68,11 @@ public class PostSpecification {
             return root.get("mainCategory").in(mainCategories);
         };
     }
+
+    public static Specification<Post> isPublic() {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("status"), Post.Status.PUBLIC);
+    }
+
 }
 

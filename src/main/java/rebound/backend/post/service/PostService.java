@@ -58,7 +58,8 @@ public class PostService {
             return Page.empty(pageable);
         }
 
-        Specification<Post> spec = PostSpecification.inMainCategories(interests);
+        Specification<Post> spec = PostSpecification.isPublic();
+        spec = spec.and(PostSpecification.inMainCategories(interests));
 
         Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
@@ -72,7 +73,8 @@ public class PostService {
             return Page.empty(pageable);
         }
 
-        Specification<Post> spec = PostSpecification.hasSubCategory(subCategory);
+        Specification<Post> spec = PostSpecification.isPublic();
+        spec = spec.and(PostSpecification.hasSubCategory(subCategory));
 
         if (mainCategory != null) {
             spec = spec.and(PostSpecification.hasMainCategory(mainCategory));
@@ -86,7 +88,8 @@ public class PostService {
      * 최신 게시글 목록 조회
      */
     public Page<PostResponse> getRecentPosts(Pageable pageable) {
-        Page<Post> posts = postRepository.findAll(pageable);
+        Specification<Post> spec = PostSpecification.isPublic();
+        Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
     }
 
@@ -226,7 +229,12 @@ public class PostService {
      * 게시글 검색 (키워드 기반, 페이징 포함)
      */
     public Page<PostResponse> searchPostsByKeyword(String keyword, Pageable pageable) {
-        Specification<Post> spec = PostSpecification.searchByKeyword(keyword);
+        Specification<Post> spec = PostSpecification.isPublic();
+
+        if (keyword != null && !keyword.isBlank()) {
+            spec = spec.and(PostSpecification.searchByKeyword(keyword));
+        }
+
         Page<Post> posts = postRepository.findAll(spec, pageable);
         return mapToPostResponsePage(posts);
     }
