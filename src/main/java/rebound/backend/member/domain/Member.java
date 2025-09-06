@@ -28,8 +28,10 @@ public class Member {
     @Column(nullable = false)
     private String loginId;
 
-    @Column(nullable = false)
+//    @Column(nullable = false)
     private String password_hash;
+
+    private String provider;
 
 //    private String email;
 
@@ -45,5 +47,10 @@ public class Member {
     public void addInterest(Interest interest) {
         this.interests.add(interest);
         interest.setMember(this);
+    }
+
+    public Member updateNickname(String nickname) {
+        this.nickname = nickname;
+        return this;
     }
 }
