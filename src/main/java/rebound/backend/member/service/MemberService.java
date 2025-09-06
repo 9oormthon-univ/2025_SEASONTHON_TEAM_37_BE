@@ -17,7 +17,10 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import rebound.backend.s3.service.S3Service;
+import rebound.backend.post.entity.Post;
+import rebound.backend.post.entity.PostReaction;
+import rebound.backend.post.repository.PostReactionRepository;
+import rebound.backend.post.repository.PostRepository;
 
 import java.time.LocalDateTime;
 import java.util.LinkedList;
@@ -31,8 +34,9 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final S3Service s3Service;
     private final MemberImageRepository memberImageRepository;
+    private final PostReactionRepository postReactionRepository;
+    private final PostRepository postRepository;
 
     public JoinResponse join(JoinRequest joinRequest) {
         //loginId 중복 검사
@@ -112,7 +116,22 @@ public class MemberService {
             categories.add(interest.getMainCategory());
         }
 
-        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, categories);
+        //hasRankingBadge 추가
+        boolean hasRankingBadge = false;
+        List<Post> memberPosts = postRepository.findPostsByMemberId(member.getId());
+        if (memberPosts.isEmpty()) {
+            hasRankingBadge = false;
+        } else {
+            for (Post memberPost : memberPosts) {
+                List<PostReaction> memberPostLikes = postReactionRepository.countTotalLikeOfPost(memberPost.getPostId());
+                if (memberPostLikes.size() >= 10) {
+                    hasRankingBadge = true;
+                }
+            }
+        }
+
+        return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(),
+                imageUrl, hasRankingBadge, member.getLoginId(), categories);
     }
 
     public void memberInfoModify(MemberModifyRequest request, Long memberId) {

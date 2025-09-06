@@ -68,4 +68,12 @@ public interface PostReactionRepository extends JpaRepository<PostReaction, Long
     // 주어진 사용자 목록이 받은 총 좋아요 수를 한 번에 조회하는 메서드
     @Query("SELECT pr.memberId, COUNT(pr) FROM PostReaction pr WHERE pr.memberId IN :memberIds AND pr.type = :type GROUP BY pr.memberId")
     List<Object[]> countTotalLikesByMemberIds(@Param("memberIds") List<Long> memberIds, @Param("type") ReactionType type);
+
+
+    @Query("""
+    SELECT pr
+    FROM PostReaction pr
+    WHERE pr.postId = :postId
+    """)
+    List<PostReaction> countTotalLikeOfPost(@Param("postId") Long postId);
 }

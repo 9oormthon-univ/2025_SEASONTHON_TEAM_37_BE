@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import rebound.backend.post.entity.Post;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificationExecutor<Post> {
 
@@ -35,4 +36,11 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
         """)
     Page<Post> findAllOrderByPopularity(@Param("since") LocalDateTime since,
                                         Pageable pageable);
+
+    @Query("""
+    SELECT p
+    FROM Post p
+    WHERE p.memberId = :memberId
+""")
+    List<Post> findPostsByMemberId(@Param("memberId") Long memberId);
 }

@@ -15,5 +15,7 @@ public class MyInfoResponse {
     private int age;
     private String field;
     private String imageUrl;
+    private boolean hasRankingBadge;
+    private String loginId;
     private List<MainCategory> interests;
 }
