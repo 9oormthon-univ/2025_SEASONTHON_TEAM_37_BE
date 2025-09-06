@@ -1,6 +1,8 @@
 package rebound.backend.member.service;
 
 import org.springframework.web.multipart.MultipartFile;
+import rebound.backend.category.entity.MainCategory;
+import rebound.backend.member.domain.Interest;
 import rebound.backend.member.domain.Member;
 import rebound.backend.member.domain.MemberImage;
 import rebound.backend.member.dtos.requests.JoinRequest;
@@ -20,6 +22,7 @@ import rebound.backend.s3.service.S3Service;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional
@@ -54,6 +57,16 @@ public class MemberService {
                 .field(joinRequest.getField())
                 .createdAt(LocalDateTime.now())
                 .build();
+
+        List<MainCategory> interests = joinRequest.getInterests();
+        if (interests != null && !interests.isEmpty()) {
+            interests.forEach(mainCategory -> {
+                Interest interest = Interest.builder()
+                        .mainCategory(mainCategory)
+                        .build();
+                member.addInterest(interest);
+            });
+        }
 
         Member savedMember = memberRepository.save(member);
 

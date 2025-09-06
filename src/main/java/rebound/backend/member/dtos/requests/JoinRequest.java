@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.Setter;
+import rebound.backend.category.entity.MainCategory;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,4 +21,6 @@ public class JoinRequest {
     private int age;
     @NotEmpty
     private String field;
+
+    private List<MainCategory> interests;
 }
