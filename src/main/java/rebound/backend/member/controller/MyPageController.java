@@ -10,8 +10,6 @@ import rebound.backend.member.dtos.responses.MyInfoResponse;
 import rebound.backend.member.service.MemberService;
 import rebound.backend.utils.InteractionAuth;
 
-import java.io.IOException;
-
 @RestController
 @RequestMapping("/api/v1/members/my")
 @RequiredArgsConstructor
@@ -31,11 +29,8 @@ public class MyPageController {
     @PatchMapping
     public ResponseEntity<Void> modifyMyInfo(@Valid @RequestBody MemberModifyRequest request) {
         Long memberId = InteractionAuth.currentMemberId();
-        try {
-            memberService.memberInfoModify(request, memberId);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("이미지 파일 오류");
-        }
+        memberService.memberInfoModify(request, memberId);
+
         return ResponseEntity.noContent().build();
     }
 }

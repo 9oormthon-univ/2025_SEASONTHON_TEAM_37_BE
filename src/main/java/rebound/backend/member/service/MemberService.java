@@ -19,7 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import rebound.backend.s3.service.S3Service;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
@@ -115,7 +114,7 @@ public class MemberService {
         return new MyInfoResponse(member.getNickname(), member.getAge(), member.getField(), imageUrl, categories);
     }
 
-    public void memberInfoModify(MemberModifyRequest request, Long memberId) throws IOException {
+    public void memberInfoModify(MemberModifyRequest request, Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 id 의 회원이 존재하지 않습니다"));
 
