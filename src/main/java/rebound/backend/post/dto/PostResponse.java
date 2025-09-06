@@ -35,6 +35,7 @@ public class PostResponse {
     private final Long bookmarkCount;
     private final Boolean liked;
     private final Boolean bookmarked;
+    private final Boolean isAnonymous;
 
     @Getter
     @Builder
@@ -117,6 +118,7 @@ public class PostResponse {
                 .liked(liked)
                 .bookmarked(bookmarked)
                 .status(post.getStatus())
+                .isAnonymous(post.getIsAnonymous())
                 .build();
     }
 }
