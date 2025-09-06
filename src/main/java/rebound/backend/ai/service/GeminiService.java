@@ -4,9 +4,9 @@ import com.google.cloud.aiplatform.v1.EndpointName;
 import com.google.cloud.aiplatform.v1.PredictRequest;
 import com.google.cloud.aiplatform.v1.PredictResponse;
 import com.google.cloud.aiplatform.v1.PredictionServiceClient;
-import com.google.protobuf.Value;
+import com.google.protobuf.Value; // 유지
+// import org.springframework.beans.factory.annotation.Value;  // ← 삭제
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,23 +17,26 @@ public class GeminiService {
 
     private final PredictionServiceClient predictionServiceClient;
 
-    @Value("${gemini.project.id}")
+    @org.springframework.beans.factory.annotation.Value("${gemini.project.id}")
     private String projectId;
 
-    @Value("${gemini.location.id}")
+    @org.springframework.beans.factory.annotation.Value("${gemini.location.id}")
     private String locationId;
 
-    @Value("${gemini.publisher.id}")
+    @org.springframework.beans.factory.annotation.Value("${gemini.publisher.id}")
     private String publisherId;
 
-    @Value("${gemini.model.id}")
+    @org.springframework.beans.factory.annotation.Value("${gemini.model.id}")
     private String modelId;
 
     public String generateContent(String prompt) {
         EndpointName endpointName = EndpointName.ofProjectLocationPublisherModelName(
                 projectId, locationId, publisherId, modelId);
 
-        Value instance = Value.newBuilder().setStringValue(prompt).build();
+        Value instance = Value.newBuilder()
+                .setStringValue(prompt)
+                .build();
+
         List<Value> instances = List.of(instance);
 
         PredictRequest predictRequest = PredictRequest.newBuilder()
