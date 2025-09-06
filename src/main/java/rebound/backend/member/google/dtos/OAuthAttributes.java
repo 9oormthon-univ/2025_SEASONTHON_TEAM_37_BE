@@ -35,7 +35,7 @@ public class OAuthAttributes {
                 .nickname(name)           // nickname 필드에 Google의 'name' 값 저장
                 .password_hash(null)      // 소셜 로그인이므로 비밀번호는 null
                 .provider("GOOGLE")
-                .age(20)
+                .age(20)                  //구글 로그인시 나이는 일단 20으로 default 세팅 -> 마이페이지에서 변경하도록
                 .createdAt(LocalDateTime.now())
                 .build();
     }
