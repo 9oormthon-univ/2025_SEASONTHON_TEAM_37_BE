@@ -290,3 +290,4 @@ public class PostService {
         return memberRepository.findByLoginId(loginId).map(Member::getId).orElse(null);
     }
 }
+//하은랭킹뱃지 커밋확인
